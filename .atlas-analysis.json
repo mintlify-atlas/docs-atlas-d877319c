@@ -1,0 +1,218 @@
+{
+  "projectType": "saas",
+  "projectName": "Scalekit",
+  "projectDescription": "Enterprise authentication platform for B2B SaaS applications with SSO, SCIM, MCP auth, and full-stack authentication capabilities",
+  "theme": "sequoia",
+  "primaryColor": "#6366f1",
+  "lightColor": "#818cf8",
+  "darkColor": "#4f46e5",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Authentication Products",
+            "pages": [
+              "products/full-stack-auth",
+              "products/agent-auth",
+              "products/mcp-auth",
+              "products/modular-sso",
+              "products/modular-scim"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/authentication-flows",
+              "concepts/session-management",
+              "concepts/organizations-users",
+              "concepts/authorization"
+            ]
+          },
+          {
+            "group": "Integration Guides",
+            "pages": [
+              "guides/full-stack-auth-setup",
+              "guides/sso-integration",
+              "guides/scim-provisioning",
+              "guides/agent-authentication",
+              "guides/mcp-servers"
+            ]
+          },
+          {
+            "group": "Security & Best Practices",
+            "pages": [
+              "security/token-management",
+              "security/session-policies",
+              "security/authentication-best-practices"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication",
+              "api/rate-limits"
+            ]
+          },
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/authorization-url",
+              "api/auth/token-exchange",
+              "api/auth/session-management",
+              "api/auth/logout"
+            ]
+          },
+          {
+            "group": "Organizations",
+            "pages": [
+              "api/organizations/create",
+              "api/organizations/list",
+              "api/organizations/get",
+              "api/organizations/update",
+              "api/organizations/delete"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api/users/create",
+              "api/users/list",
+              "api/users/get",
+              "api/users/update",
+              "api/users/delete"
+            ]
+          },
+          {
+            "group": "SSO Connections",
+            "pages": [
+              "api/sso/connections",
+              "api/sso/saml-configuration",
+              "api/sso/oidc-configuration"
+            ]
+          },
+          {
+            "group": "SCIM",
+            "pages": [
+              "api/scim/users",
+              "api/scim/groups",
+              "api/scim/directory-sync"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "api/webhooks/overview",
+              "api/webhooks/events",
+              "api/webhooks/security"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDKs",
+        "groups": [
+          {
+            "group": "Official SDKs",
+            "pages": [
+              "sdks/overview",
+              "sdks/nodejs",
+              "sdks/python",
+              "sdks/go",
+              "sdks/java",
+              "sdks/expo"
+            ]
+          },
+          {
+            "group": "SDK Features",
+            "pages": [
+              "sdks/installation",
+              "sdks/configuration",
+              "sdks/error-handling",
+              "sdks/examples"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Developer Tools",
+            "pages": [
+              "resources/testing-utilities",
+              "resources/sso-simulator",
+              "resources/api-collections",
+              "resources/cli-tools"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "resources/sso-integrations",
+              "resources/scim-integrations",
+              "resources/social-connections",
+              "resources/agent-connectors"
+            ]
+          },
+          {
+            "group": "Additional Resources",
+            "pages": [
+              "resources/code-samples",
+              "resources/migration-guides",
+              "resources/troubleshooting",
+              "resources/changelog"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Full-stack authentication with hosted login pages",
+    "Enterprise SSO (SAML, OIDC) integration",
+    "SCIM user provisioning and directory sync",
+    "Agent authentication for AI applications",
+    "MCP (Model Context Protocol) authentication",
+    "Multi-language SDK support (Node.js, Python, Go, Java)",
+    "Session management with configurable security policies",
+    "Role-based access control (RBAC) and authorization",
+    "Social login integrations",
+    "Passwordless authentication (magic links, OTP, passkeys)",
+    "Webhooks and event interceptors",
+    "Self-service admin portal for enterprise customers",
+    "Multi-app authentication support",
+    "Custom domain and branding capabilities"
+  ],
+  "publicApiSurface": [
+    "Authentication API - getAuthorizationUrl(), authenticateWithCode(), refreshAccessToken()",
+    "Session Management - validateAccessToken(), getLogoutUrl()",
+    "Organizations API - create, list, get, update, delete organizations",
+    "Users API - create, list, get, update, delete users",
+    "SSO Connections - configure SAML/OIDC providers",
+    "SCIM API - user/group provisioning endpoints",
+    "Directory Sync - manage enterprise user directories",
+    "Roles & Permissions - RBAC management",
+    "Webhooks - event subscriptions and handlers",
+    "Admin Portal - embeddable SSO/SCIM setup widgets",
+    "Agent Auth - OAuth flows for AI agents",
+    "MCP Authentication - secure MCP server connections",
+    "API Keys - machine-to-machine authentication",
+    "Custom Attributes - extend user profiles",
+    "Domain Management - custom authentication domains"
+  ]
+}
