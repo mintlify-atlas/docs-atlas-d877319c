@@ -1,0 +1,324 @@
+---
+title: Session management
+description: Learn how Scalekit manages user sessions with tokens, refresh mechanisms, and security policies
+---
+
+User sessions determine how long users stay authenticated in your application. Scalekit uses industry-standard JWT tokens to manage sessions securely and efficiently.
+
+## Session tokens
+
+After successful authentication, Scalekit returns three types of tokens:
+
+### ID token
+
+Contains verified user identity information.
+
+**Structure**:
+```json
+{
+  "sub": "usr_1234567890",           // User ID
+  "oid": "org_1234567890",           // Organization ID
+  "email": "user@example.com",
+  "name": "John Doe",
+  "email_verified": true,
+  "iss": "https://auth.scalekit.com",
+  "aud": "your-client-id",
+  "exp": 1234567890,
+  "iat": 1234567890
+}
+```
+
+**Use cases**:
+- Display user profile information
+- Create application user records
+- Store user metadata
+
+### Access token
+
+Short-lived token used to authorize API requests.
+
+**Structure**:
+```json
+{
+  "sub": "usr_1234567890",
+  "oid": "org_1234567890",
+  "roles": ["admin", "editor"],
+  "permissions": ["read:documents", "write:documents"],
+  "exp": 1234567890,
+  "iat": 1234567890
+}
+```
+
+**Properties**:
+- Default lifetime: 5 minutes (configurable)
+- Contains user roles and permissions
+- Should be validated on every request
+- Stored in HttpOnly cookies or Authorization headers
+
+**Use cases**:
+- Authorize API requests
+- Check user permissions
+- Validate current session status
+
+### Refresh token
+
+Long-lived token used to obtain new access tokens.
+
+**Properties**:
+- Lifetime: Configurable (default 30 days)
+- Single-use with automatic rotation
+- Should be stored securely server-side
+- Invalidated on logout or security events
+
+**Use cases**:
+- Refresh expired access tokens
+- Maintain long-lived sessions
+- Implement "remember me" functionality
+
+## Token storage
+
+### Web applications
+
+Store tokens in HttpOnly cookies with proper security attributes:
+
+```javascript
+// Access token - short-lived, frequent access
+res.cookie('accessToken', accessToken, {
+  maxAge: (expiresIn - 60) * 1000,  // Subtract buffer for clock skew
+  httpOnly: true,                    // Prevent XSS attacks
+  secure: true,                      // HTTPS only
+  sameSite: 'strict',                // CSRF protection
+  path: '/api'                       // Scope to API routes
+});
+
+// Refresh token - long-lived, infrequent access
+res.cookie('refreshToken', refreshToken, {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'strict',
+  path: '/auth/refresh'              // Scope to refresh endpoint only
+});
+```
+
+### Single-page applications (SPAs)
+
+- Store access tokens in memory
+- Send via Authorization header: `Bearer <token>`
+- Refresh tokens should be stored in HttpOnly cookies
+- Never store tokens in localStorage or sessionStorage
+
+### Mobile applications
+
+- Use secure platform storage (iOS Keychain, Android KeyStore)
+- Implement certificate pinning for API requests
+- Use refresh token rotation
+- Clear tokens on app logout or uninstall
+
+## Token validation
+
+Validate access tokens on every protected request:
+
+<CodeGroup>
+
+```javascript Node.js
+const isValid = await scalekit.validateAccessToken(accessToken);
+
+if (!isValid) {
+  // Token expired or invalid - attempt refresh
+  const authResult = await scalekit.refreshAccessToken(refreshToken);
+  // Update stored tokens
+}
+```
+
+```python Python
+is_valid = scalekit_client.validate_access_token(access_token)
+
+if not is_valid:
+    # Token expired or invalid - attempt refresh
+    auth_result = scalekit_client.refresh_access_token(refresh_token)
+    # Update stored tokens
+```
+
+```go Go
+isValid, err := scalekitClient.ValidateAccessToken(ctx, accessToken)
+
+if !isValid || err != nil {
+    // Token expired or invalid - attempt refresh
+    authResult, err := scalekitClient.RefreshAccessToken(ctx, refreshToken)
+    // Update stored tokens
+}
+```
+
+```java Java
+boolean isValid = scalekitClient.validateAccessToken(accessToken);
+
+if (!isValid) {
+    // Token expired or invalid - attempt refresh
+    AuthResult authResult = scalekitClient.authentication().refreshToken(refreshToken);
+    // Update stored tokens
+}
+```
+
+</CodeGroup>
+
+## Token refresh
+
+Refresh tokens automatically in middleware to maintain seamless sessions:
+
+```javascript
+async function authMiddleware(req, res, next) {
+  const { accessToken, refreshToken } = req.cookies;
+  
+  const isValid = await scalekit.validateAccessToken(accessToken);
+  
+  if (!isValid && refreshToken) {
+    // Transparently refresh the token
+    const authResult = await scalekit.refreshAccessToken(refreshToken);
+    
+    // Update cookies with new tokens
+    res.cookie('accessToken', authResult.accessToken, { /* ... */ });
+    res.cookie('refreshToken', authResult.refreshToken, { /* ... */ });
+  }
+  
+  next();
+}
+```
+
+## Session policies
+
+Configure session behavior in **Dashboard > Authentication > Session Policy**:
+
+### Absolute session timeout
+
+Maximum session duration regardless of activity.
+
+- Default: 30 days
+- Range: 5 minutes to 1 year
+- Use case: Enforce periodic re-authentication for security
+
+### Idle session timeout
+
+Inactivity period before session expires.
+
+- Default: Disabled
+- Range: 5 minutes to 30 days
+- Use case: Auto-logout for shared devices or kiosks
+
+### Access token lifetime
+
+Duration before access token must be refreshed.
+
+- Default: 5 minutes
+- Range: 1 minute to 1 hour
+- Use case: Balance security with refresh frequency
+
+## Session revocation
+
+Revoke sessions programmatically for security or administrative purposes:
+
+<CodeGroup>
+
+```javascript Node.js
+// Revoke a specific session
+await scalekit.session.revokeSession(sessionId);
+
+// Revoke all sessions for a user
+await scalekit.session.revokeAllUserSessions(userId);
+```
+
+```python Python
+# Revoke a specific session
+scalekit_client.session.revoke_session(session_id)
+
+# Revoke all sessions for a user
+scalekit_client.session.revoke_all_user_sessions(user_id)
+```
+
+```go Go
+// Revoke a specific session
+scalekitClient.Session().RevokeSession(ctx, sessionId)
+
+// Revoke all sessions for a user
+scalekitClient.Session().RevokeAllUserSessions(ctx, userId)
+```
+
+```java Java
+// Revoke a specific session
+scalekitClient.sessions().revokeSession(sessionId);
+
+// Revoke all sessions for a user
+scalekitClient.sessions().revokeAllUserSessions(userId);
+```
+
+</CodeGroup>
+
+## Security best practices
+
+### Token encryption
+
+Encrypt tokens before storing in cookies:
+
+```javascript
+const encryptedToken = encrypt(accessToken);
+res.cookie('accessToken', encryptedToken, { /* ... */ });
+```
+
+### Token rotation
+
+Rotate refresh tokens on each use to detect theft:
+
+- New refresh token issued with each refresh
+- Old refresh token invalidated immediately
+- Concurrent refresh attempts trigger security alert
+
+### Clock skew tolerance
+
+Account for time differences between servers:
+
+- Subtract 60 seconds from token expiration
+- Validate `exp` claim with leeway
+- Sync server clocks with NTP
+
+### CSRF protection
+
+- Use `SameSite=Strict` cookies
+- Implement CSRF tokens for state-changing operations
+- Validate Origin and Referer headers
+
+## Multi-device sessions
+
+Manage sessions across multiple devices:
+
+```javascript
+// List all active sessions for a user
+const sessions = await scalekit.session.getUserSessions(userId);
+
+sessions.forEach(session => {
+  console.log({
+    sessionId: session.id,
+    device: session.device,
+    location: session.location,
+    lastActive: session.lastActiveAt
+  });
+});
+
+// Allow users to revoke specific sessions
+await scalekit.session.revokeSession(sessionId);
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication flows" icon="arrow-right-arrow-left" href="/concepts/authentication-flows">
+    Learn about different authentication methods
+  </Card>
+  <Card title="Token management" icon="key" href="/security/token-management">
+    Best practices for handling tokens securely
+  </Card>
+  <Card title="Session policies" icon="shield" href="/security/session-policies">
+    Configure session timeouts and security settings
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/auth/session-management">
+    Complete session management API documentation
+  </Card>
+</CardGroup>

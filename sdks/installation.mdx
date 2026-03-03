@@ -1,0 +1,281 @@
+---
+title: 'SDK Installation'
+description: 'Install Scalekit SDKs for Node.js, Python, Go, Java, and Expo'
+sidebar:
+  label: 'Installation'
+  order: 7
+---
+
+Install the Scalekit SDK for your programming language or platform. All SDKs support the same core authentication features with language-specific optimizations.
+
+## Node.js
+
+Install via npm or yarn:
+
+<Tabs syncKey="package-manager">
+  <TabItem label="npm">
+```bash
+npm install @scalekit-sdk/node
+```
+  </TabItem>
+  <TabItem label="yarn">
+```bash
+yarn add @scalekit-sdk/node
+```
+  </TabItem>
+  <TabItem label="pnpm">
+```bash
+pnpm add @scalekit-sdk/node
+```
+  </TabItem>
+</Tabs>
+
+**Requirements:**
+- Node.js 14.x or higher
+- TypeScript 4.x or higher (optional)
+
+**Package:** [@scalekit-sdk/node](https://www.npmjs.com/package/@scalekit-sdk/node)
+
+## Python
+
+Install via pip:
+
+```bash
+pip install scalekit-sdk-python
+```
+
+**Requirements:**
+- Python 3.7 or higher
+- pip 20.0 or higher
+
+**Package:** [scalekit-sdk-python](https://pypi.org/project/scalekit-sdk-python/)
+
+## Go
+
+Install via go get:
+
+```bash
+go get -u github.com/scalekit-inc/scalekit-sdk-go
+```
+
+**Requirements:**
+- Go 1.18 or higher
+- Go modules enabled
+
+**Package:** [scalekit-sdk-go](https://pkg.go.dev/github.com/scalekit-inc/scalekit-sdk-go)
+
+## Java
+
+Install via Gradle or Maven:
+
+<Tabs syncKey="java-build-tool">
+  <TabItem label="Gradle">
+```groovy
+implementation "com.scalekit:scalekit-sdk-java:2.0.11"
+```
+  </TabItem>
+  <TabItem label="Maven">
+```xml
+<dependency>
+    <groupId>com.scalekit</groupId>
+    <artifactId>scalekit-sdk-java</artifactId>
+    <version>2.0.11</version>
+</dependency>
+```
+  </TabItem>
+</Tabs>
+
+**Requirements:**
+- Java 11 or higher
+- Gradle 7.x or Maven 3.8+
+
+**Package:** [scalekit-sdk-java](https://central.sonatype.com/artifact/com.scalekit/scalekit-sdk-java)
+
+## Expo (React Native)
+
+Install via npx expo:
+
+```bash
+npx expo install @scalekit-sdk/expo expo-auth-session expo-secure-store
+```
+
+**Requirements:**
+- Expo SDK 48 or higher
+- React Native 0.71 or higher
+
+**Dependencies:**
+- `expo-auth-session` - For OAuth flows
+- `expo-secure-store` - For secure token storage
+
+## Verify Installation
+
+Verify the SDK is installed correctly:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+import { Scalekit } from '@scalekit-sdk/node';
+
+console.log('Scalekit SDK loaded:', typeof Scalekit);
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+from scalekit import ScalekitClient
+
+print("Scalekit SDK loaded:", ScalekitClient)
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+import "github.com/scalekit-inc/scalekit-sdk-go"
+
+fmt.Println("Scalekit SDK loaded")
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+
+System.out.println("Scalekit SDK loaded");
+```
+  </TabItem>
+</Tabs>
+
+## Troubleshooting
+
+### Node.js Issues
+
+**Error: Cannot find module '@scalekit-sdk/node'**
+
+Ensure you've installed the package:
+```bash
+npm install @scalekit-sdk/node
+```
+
+Clear npm cache if needed:
+```bash
+npm cache clean --force
+npm install
+```
+
+### Python Issues
+
+**Error: No module named 'scalekit'**
+
+Verify installation:
+```bash
+pip list | grep scalekit
+```
+
+Upgrade pip and reinstall:
+```bash
+pip install --upgrade pip
+pip install --upgrade scalekit-sdk-python
+```
+
+### Go Issues
+
+**Error: package github.com/scalekit-inc/scalekit-sdk-go is not in GOROOT**
+
+Run `go mod tidy` to download dependencies:
+```bash
+go mod tidy
+```
+
+Verify go.mod includes the SDK:
+```go
+require github.com/scalekit-inc/scalekit-sdk-go v1.x.x
+```
+
+### Java Issues
+
+**Error: Could not find com.scalekit:scalekit-sdk-java**
+
+Ensure Maven Central is in your repositories:
+
+**Gradle:**
+```groovy
+repositories {
+    mavenCentral()
+}
+```
+
+**Maven:**
+```xml
+<repositories>
+    <repository>
+        <id>central</id>
+        <url>https://repo.maven.apache.org/maven2</url>
+    </repository>
+</repositories>
+```
+
+### Expo Issues
+
+**Error: expo-auth-session not found**
+
+Install missing dependencies:
+```bash
+npx expo install expo-auth-session expo-secure-store
+```
+
+Clear cache and reinstall:
+```bash
+npx expo start --clear
+```
+
+## Version Compatibility
+
+| SDK | Current Version | Minimum Runtime |
+|-----|----------------|----------------|
+| Node.js | 2.x | Node.js 14+ |
+| Python | 1.x | Python 3.7+ |
+| Go | 1.x | Go 1.18+ |
+| Java | 2.0.11 | Java 11+ |
+| Expo | 1.x | Expo SDK 48+ |
+
+## Update SDKs
+
+Keep your SDK updated for latest features and security patches:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```bash
+npm update @scalekit-sdk/node
+```
+  </TabItem>
+  <TabItem label="Python">
+```bash
+pip install --upgrade scalekit-sdk-python
+```
+  </TabItem>
+  <TabItem label="Go">
+```bash
+go get -u github.com/scalekit-inc/scalekit-sdk-go
+```
+  </TabItem>
+  <TabItem label="Java">
+Update version in `build.gradle` or `pom.xml`, then rebuild:
+```bash
+./gradlew build --refresh-dependencies
+```
+  </TabItem>
+</Tabs>
+
+## Next Steps
+
+After installation:
+
+1. [Configure SDK credentials](/sdks/configuration/)
+2. [Review SDK documentation](/sdks/overview/)
+3. [Explore code examples](/sdks/examples/)
+4. [Understand error handling](/sdks/error-handling/)
+
+## Support
+
+If you encounter installation issues:
+
+- Check [GitHub Issues](https://github.com/scalekit-inc) for your SDK
+- Review SDK-specific documentation
+- Contact support at support@scalekit.com

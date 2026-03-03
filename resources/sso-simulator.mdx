@@ -1,0 +1,41 @@
+---
+title: SSO simulator
+description: Test SSO integrations without configuring identity providers
+---
+
+The SSO Simulator helps you test SSO flows during development.
+
+## Features
+
+- Test SAML 2.0 flows
+- Test OIDC flows
+- Customize user attributes
+- Test error scenarios
+- No IdP configuration required
+
+## Using the simulator
+
+1. Create test organization with domain `@example.com`
+2. Generate authorization URL with test email
+3. User redirected to simulator login page
+4. Enter any credentials (all accepted)
+5. Complete authentication flow
+
+## Custom attributes
+
+Test custom SAML/OIDC attributes:
+
+- Modify returned user claims
+- Test attribute mapping
+- Verify profile synchronization
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Testing utilities" icon="flask" href="/resources/testing-utilities">
+    Other testing tools
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/resources/troubleshooting">
+    Common issues
+  </Card>
+</CardGroup>

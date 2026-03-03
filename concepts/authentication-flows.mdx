@@ -1,0 +1,174 @@
+---
+title: Authentication flows
+description: Understand how different authentication methods work in Scalekit
+---
+
+Scalekit supports multiple authentication flows to meet the needs of different applications and user scenarios. This guide explains how each flow works and when to use them.
+
+## OAuth 2.0 authorization code flow
+
+The authorization code flow is the most secure OAuth 2.0 flow and is used for all Scalekit authentication methods. It separates user authentication from token exchange, ensuring tokens are never exposed to the browser.
+
+### How it works
+
+1. **User initiates login**: Your application redirects the user to Scalekit's authorization endpoint
+2. **User authenticates**: The user verifies their identity using their chosen method (password, social login, or enterprise SSO)
+3. **Authorization code returned**: Scalekit redirects back to your application with a temporary authorization code
+4. **Token exchange**: Your backend exchanges the authorization code for access tokens
+5. **User session created**: Your application creates a session using the returned tokens
+
+### Security considerations
+
+- Authorization codes are single-use and expire quickly (typically 5 minutes)
+- Token exchange happens server-to-server, never exposing tokens to the browser
+- PKCE (Proof Key for Code Exchange) adds additional security for mobile and SPA applications
+
+## Password-based authentication
+
+Users authenticate with email and password credentials managed by Scalekit.
+
+### Features
+
+- Secure password hashing using industry-standard algorithms
+- Password strength requirements configurable in dashboard
+- Account lockout protection after failed attempts
+- Password reset flows with email verification
+
+### When to use
+
+- B2C applications requiring simple user registration
+- Internal tools with basic authentication needs
+- Prototypes and MVPs
+
+## Magic link authentication
+
+Passwordless authentication where users receive a login link via email.
+
+### How it works
+
+1. User enters their email address
+2. Scalekit sends a one-time login link
+3. User clicks the link to authenticate
+4. User is redirected back to your application with an authorization code
+
+### Benefits
+
+- No password management for users
+- Reduced support burden from password resets
+- Better security than weak passwords
+- Improved mobile experience
+
+## Social authentication
+
+Users authenticate using existing accounts from social providers like Google, Microsoft, GitHub, or LinkedIn.
+
+### Supported providers
+
+- Google
+- Microsoft
+- GitHub
+- LinkedIn
+- Facebook
+- Apple
+
+### Configuration
+
+Each social provider can be configured with:
+- Your own OAuth credentials (recommended for production)
+- Scalekit's shared credentials (for quick development)
+
+### When to use
+
+- Consumer applications with social users
+- Developer tools where GitHub login makes sense
+- B2B applications where users prefer social login
+
+## Enterprise SSO
+
+Enterprise customers authenticate using their organization's identity provider via SAML or OIDC.
+
+### Supported protocols
+
+- **SAML 2.0**: Industry standard for enterprise SSO
+- **OpenID Connect (OIDC)**: Modern OAuth 2.0-based protocol
+
+### How it works
+
+1. User initiates login with organization identifier or email domain
+2. Scalekit routes to the organization's identity provider
+3. User authenticates with their corporate credentials
+4. Identity provider returns user attributes to Scalekit
+5. Scalekit normalizes the profile and returns it to your application
+
+### Supported identity providers
+
+- Okta
+- Azure AD / Microsoft Entra ID
+- Google Workspace
+- JumpCloud
+- OneLogin
+- Auth0
+- Any SAML 2.0 or OIDC-compliant provider
+
+### When to use
+
+- B2B SaaS applications
+- Enterprise customer requirements
+- Compliance needs (SOC 2, ISO 27001)
+- Organizations requiring centralized access control
+
+## Multi-factor authentication (MFA)
+
+Add an extra layer of security by requiring a second verification factor.
+
+### Supported factors
+
+- Time-based one-time passwords (TOTP)
+- SMS verification codes
+- Email verification codes
+- Authenticator apps (Google Authenticator, Authy, etc.)
+
+### Configuration
+
+MFA can be configured as:
+- **Optional**: Users choose to enable MFA
+- **Required**: All users must configure MFA
+- **Conditional**: Required based on user role or organization policy
+
+## Choosing the right flow
+
+| Use case | Recommended flow |
+|----------|------------------|
+| Consumer app | Magic link or Social authentication |
+| Internal tool | Password or Social authentication |
+| Enterprise SaaS | Enterprise SSO |
+| Developer tool | GitHub social login |
+| High security needs | Password + MFA or Enterprise SSO |
+| Mobile app | Magic link or Social authentication |
+
+## Session management
+
+Regardless of the authentication method, all flows result in:
+
+- **ID token**: Contains user identity claims
+- **Access token**: Used to authorize API requests
+- **Refresh token**: Used to obtain new access tokens
+
+See [Session management](/concepts/session-management) for details on token handling.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Session management" icon="clock" href="/concepts/session-management">
+    Learn how to manage user sessions and tokens
+  </Card>
+  <Card title="Organizations and users" icon="users" href="/concepts/organizations-users">
+    Understand multi-tenant user and organization models
+  </Card>
+  <Card title="Full-stack auth setup" icon="rocket" href="/guides/full-stack-auth-setup">
+    Implement complete authentication in your app
+  </Card>
+  <Card title="SSO integration" icon="building" href="/guides/sso-integration">
+    Add enterprise SSO for your customers
+  </Card>
+</CardGroup>

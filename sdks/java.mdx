@@ -1,0 +1,524 @@
+---
+title: 'Java SDK'
+description: 'Official Java SDK with Spring Boot support for enterprise authentication and session management'
+sidebar:
+  label: 'Java'
+  order: 5
+---
+
+The official Java SDK streamlines enterprise authentication, with Spring Boot integration patterns for secure login and session handling.
+
+## Installation
+
+### Gradle
+
+Add the following to your `build.gradle`:
+
+```groovy
+implementation "com.scalekit:scalekit-sdk-java:2.0.11"
+```
+
+### Maven
+
+Add the following to your `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>com.scalekit</groupId>
+    <artifactId>scalekit-sdk-java</artifactId>
+    <version>2.0.11</version>
+</dependency>
+```
+
+## Quick Start
+
+Initialize the Scalekit client with your environment credentials:
+
+```java title="utils/Auth.java"
+import com.scalekit.ScalekitClient;
+
+public class Auth {
+    public ScalekitClient createScalekitClient() {
+        return new ScalekitClient(
+            System.getenv("SCALEKIT_ENVIRONMENT_URL"),
+            System.getenv("SCALEKIT_CLIENT_ID"),
+            System.getenv("SCALEKIT_CLIENT_SECRET")
+        );
+    }
+}
+```
+
+**Security:** Store credentials in environment variables. Never hard-code secrets in your source code.
+
+## Core Methods
+
+### Generate Authorization URL
+
+Create an authorization URL to redirect users:
+
+```java title="Login controller"
+import com.scalekit.client.Scalekit;
+import com.scalekit.client.models.AuthorizationUrlOptions;
+import java.net.URL;
+import java.util.Arrays;
+
+String redirectUri = "https://yourapp.com/auth/callback";
+
+AuthorizationUrlOptions options = new AuthorizationUrlOptions();
+options.setScopes(Arrays.asList("openid", "profile", "email", "offline_access"));
+options.setState(generateSecureState()); // For CSRF protection
+
+URL url = scalekitClient.authentication().getAuthorizationUrl(redirectUri, options);
+return new RedirectView(url.toString());
+```
+
+### Exchange Authorization Code
+
+Exchange the authorization code for tokens:
+
+```java title="Callback controller"
+import com.scalekit.client.models.AuthenticationOptions;
+import com.scalekit.client.models.AuthenticationResponse;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.view.RedirectView;
+import javax.servlet.http.HttpSession;
+
+@GetMapping("/auth/callback")
+public Object authCallback(
+    @RequestParam(required = false) String code,
+    @RequestParam(required = false) String error,
+    @RequestParam(required = false) String state,
+    HttpSession session
+) {
+    // Handle errors
+    if (error != null) {
+        return new RedirectView("/login?error=auth_failed");
+    }
+
+    if (code == null) {
+        return new RedirectView("/login?error=missing_code");
+    }
+
+    try {
+        // Exchange code for tokens
+        AuthenticationOptions options = new AuthenticationOptions();
+        AuthenticationResponse authResult = scalekitClient
+            .authentication()
+            .authenticateWithCode(code, "https://yourapp.com/auth/callback", options);
+
+        var user = authResult.getIdTokenClaims();
+        String accessToken = authResult.getAccessToken();
+        String refreshToken = authResult.getRefreshToken();
+
+        // Store user in session
+        session.setAttribute("user", user);
+        return new RedirectView("/dashboard");
+
+    } catch (Exception e) {
+        System.err.println("Token exchange failed: " + e.getMessage());
+        return new RedirectView("/login?error=exchange_failed");
+    }
+}
+```
+
+### Validate Access Token
+
+Validate tokens in interceptors:
+
+```java title="AuthInterceptor.java"
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.stereotype.Component;
+
+@Component
+public class AuthInterceptor implements HandlerInterceptor {
+
+    @Override
+    public boolean preHandle(
+        HttpServletRequest request,
+        HttpServletResponse response,
+        Object handler
+    ) throws Exception {
+        String accessToken = getCookieValue(request, "accessToken");
+
+        if (accessToken == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"error\": \"Authentication required\"}");
+            return false;
+        }
+
+        try {
+            boolean isValid = scalekitClient.validateAccessToken(accessToken);
+
+            if (!isValid) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"error\": \"Invalid token\"}");
+                return false;
+            }
+
+            return true;
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"error\": \"Authentication failed\"}");
+            return false;
+        }
+    }
+
+    private String getCookieValue(HttpServletRequest request, String cookieName) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (cookieName.equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
+    }
+}
+```
+
+### Refresh Access Token
+
+Refresh expired tokens:
+
+```java title="Token refresh"
+import com.scalekit.client.models.AuthResult;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletResponse;
+
+try {
+    String refreshToken = getCookieValue(request, "refreshToken");
+    AuthResult authResult = scalekitClient.authentication().refreshToken(refreshToken);
+
+    // Update cookies with new tokens
+    Cookie accessTokenCookie = new Cookie("accessToken", authResult.getAccessToken());
+    accessTokenCookie.setMaxAge(authResult.getExpiresIn() - 60);
+    accessTokenCookie.setHttpOnly(true);
+    accessTokenCookie.setSecure(true);
+    accessTokenCookie.setPath("/");
+    response.addCookie(accessTokenCookie);
+
+} catch (Exception e) {
+    System.err.println("Token refresh failed: " + e.getMessage());
+    return new RedirectView("/login");
+}
+```
+
+## Organization Management
+
+### Create Organization
+
+Create organizations for enterprise customers:
+
+```java
+import com.scalekit.client.models.CreateOrganizationRequest;
+import com.scalekit.client.models.Organization;
+
+CreateOrganizationRequest request = CreateOrganizationRequest.newBuilder()
+    .setName("Acme Corp")
+    .setExternalId("org_12345")
+    .build();
+
+Organization organization = scalekitClient.organization().createOrganization(request);
+System.out.println("Organization created: " + organization.getId());
+```
+
+### Generate Admin Portal Link
+
+Generate portal links for SSO configuration:
+
+```java
+import com.scalekit.client.models.Link;
+import com.scalekit.client.models.Feature;
+import java.util.Arrays;
+
+Link portalLink = scalekitClient.organizations().generatePortalLink(
+    organizationId,
+    Arrays.asList(Feature.sso, Feature.dir_sync)
+);
+
+// Use link.getLocation() for iframe or shareable URL
+return ResponseEntity.ok(Map.of("portalUrl", portalLink.getLocation()));
+```
+
+## Session Management
+
+### Get Session Details
+
+Retrieve session information:
+
+```java
+import com.scalekit.client.models.SessionDetails;
+
+SessionDetails sessionDetails = scalekitClient.sessions().getSession(
+    "ses_1234567890123456"
+);
+
+System.out.println("Session: " + sessionDetails);
+```
+
+### List User Sessions
+
+List all sessions for a user:
+
+```java
+import com.scalekit.client.models.UserSessionFilter;
+import com.scalekit.client.models.UserSessionDetails;
+import com.google.protobuf.Timestamp;
+import java.time.Instant;
+
+UserSessionFilter filter = UserSessionFilter.newBuilder()
+    .addStatus("ACTIVE")
+    .setStartTime(
+        Timestamp.newBuilder()
+            .setSeconds(Instant.parse("2025-01-01T00:00:00Z").getEpochSecond())
+            .build()
+    )
+    .setEndTime(
+        Timestamp.newBuilder()
+            .setSeconds(Instant.parse("2025-12-31T23:59:59Z").getEpochSecond())
+            .build()
+    )
+    .build();
+
+UserSessionDetails userSessions = scalekitClient.sessions().getUserSessions(
+    "usr_1234567890123456",
+    10,    // page size
+    "",    // page token
+    filter
+);
+```
+
+### Revoke Session
+
+Revoke specific sessions:
+
+```java
+import com.scalekit.client.models.RevokeSessionResponse;
+
+RevokeSessionResponse revokedSession = scalekitClient.sessions().revokeSession(
+    "ses_1234567890123456"
+);
+
+System.out.println("Session revoked");
+```
+
+### Revoke All User Sessions
+
+Logout from all devices:
+
+```java
+import com.scalekit.client.models.RevokeAllUserSessionsResponse;
+
+RevokeAllUserSessionsResponse revokedSessions = scalekitClient
+    .sessions()
+    .revokeAllUserSessions("usr_1234567890123456");
+
+System.out.println("All sessions revoked");
+```
+
+## Advanced Features
+
+### Custom Authorization Options
+
+Customize authorization with additional parameters:
+
+```java
+import com.scalekit.client.models.AuthorizationUrlOptions;
+import java.util.Arrays;
+
+AuthorizationUrlOptions options = new AuthorizationUrlOptions();
+options.setScopes(Arrays.asList("openid", "profile", "email", "offline_access"));
+options.setOrganizationId("org_123");      // Route to specific organization
+options.setConnectionId("conn_456");       // Route to specific connection
+options.setLoginHint("user@example.com");  // Pre-fill email
+options.setPrompt("login");                // Force re-authentication
+options.setState(generateState());         // CSRF protection
+
+URL url = scalekitClient.authentication().getAuthorizationUrl(redirectUri, options);
+```
+
+### Error Handling
+
+Handle SDK exceptions:
+
+```java
+try {
+    AuthenticationResponse result = scalekitClient
+        .authentication()
+        .authenticateWithCode(code, redirectUri, options);
+
+} catch (ScalekitException e) {
+    if ("invalid_grant".equals(e.getErrorCode())) {
+        // Authorization code expired or already used
+        return new RedirectView("/login?error=code_expired");
+    }
+
+    if ("invalid_client".equals(e.getErrorCode())) {
+        // Invalid credentials
+        System.err.println("SDK configuration error");
+    }
+
+    // Handle other errors
+    System.err.println("Authentication error: " + e.getMessage());
+    return new RedirectView("/login?error=auth_failed");
+}
+```
+
+## Spring Boot Integration
+
+### Configuration Bean
+
+Define Scalekit as a Spring Bean:
+
+```java title="ScalekitConfig.java"
+import com.scalekit.ScalekitClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
+
+@Configuration
+public class ScalekitConfig {
+
+    @Value("${scalekit.environment.url}")
+    private String environmentUrl;
+
+    @Value("${scalekit.client.id}")
+    private String clientId;
+
+    @Value("${scalekit.client.secret}")
+    private String clientSecret;
+
+    @Bean
+    public ScalekitClient scalekitClient() {
+        return new ScalekitClient(
+            environmentUrl,
+            clientId,
+            clientSecret
+        );
+    }
+}
+```
+
+### Application Properties
+
+Configure in `application.properties`:
+
+```properties
+scalekit.environment.url=${SCALEKIT_ENVIRONMENT_URL}
+scalekit.client.id=${SCALEKIT_CLIENT_ID}
+scalekit.client.secret=${SCALEKIT_CLIENT_SECRET}
+```
+
+### Auth Controller
+
+Complete Spring Boot controller:
+
+```java title="AuthController.java"
+import com.scalekit.ScalekitClient;
+import com.scalekit.client.models.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.view.RedirectView;
+import javax.servlet.http.HttpSession;
+import java.net.URL;
+import java.util.Arrays;
+
+@RestController
+@RequestMapping("/auth")
+public class AuthController {
+
+    @Autowired
+    private ScalekitClient scalekitClient;
+
+    @GetMapping("/login")
+    public RedirectView login(HttpSession session) {
+        String state = generateState();
+        session.setAttribute("oauth_state", state);
+
+        AuthorizationUrlOptions options = new AuthorizationUrlOptions();
+        options.setScopes(Arrays.asList("openid", "profile", "email"));
+        options.setState(state);
+
+        URL url = scalekitClient.authentication().getAuthorizationUrl(
+            "https://yourapp.com/auth/callback",
+            options
+        );
+
+        return new RedirectView(url.toString());
+    }
+
+    @GetMapping("/callback")
+    public RedirectView callback(
+        @RequestParam String code,
+        @RequestParam String state,
+        HttpSession session
+    ) {
+        String storedState = (String) session.getAttribute("oauth_state");
+        session.removeAttribute("oauth_state");
+
+        if (!state.equals(storedState)) {
+            return new RedirectView("/login?error=invalid_state");
+        }
+
+        try {
+            AuthenticationOptions options = new AuthenticationOptions();
+            AuthenticationResponse authResult = scalekitClient
+                .authentication()
+                .authenticateWithCode(
+                    code,
+                    "https://yourapp.com/auth/callback",
+                    options
+                );
+
+            session.setAttribute("user", authResult.getIdTokenClaims());
+            return new RedirectView("/dashboard");
+
+        } catch (Exception e) {
+            System.err.println("Authentication failed: " + e.getMessage());
+            return new RedirectView("/login?error=auth_failed");
+        }
+    }
+
+    private String generateState() {
+        return java.util.UUID.randomUUID().toString();
+    }
+}
+```
+
+### Interceptor Registration
+
+Register the auth interceptor:
+
+```java title="WebConfig.java"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Autowired
+    private AuthInterceptor authInterceptor;
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(authInterceptor)
+            .addPathPatterns("/api/**", "/dashboard/**")
+            .excludePathPatterns("/auth/**", "/login", "/public/**");
+    }
+}
+```
+
+## Resources
+
+- [GitHub Repository](https://github.com/scalekit-inc/scalekit-sdk-java)
+- [Maven Central](https://central.sonatype.com/artifact/com.scalekit/scalekit-sdk-java)
+- [Installation Guide](/sdks/installation/)
+- [Configuration Guide](/sdks/configuration/)
+- [Error Handling](/sdks/error-handling/)
+- [Code Examples](/sdks/examples/)

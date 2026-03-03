@@ -1,0 +1,199 @@
+---
+title: 'SDK Overview'
+description: 'Official SDKs for Node.js, Python, Go, Java, and Expo to integrate Scalekit authentication into your application'
+sidebar:
+  label: 'Overview'
+  order: 1
+---
+
+Scalekit provides official SDKs for popular programming languages and frameworks to streamline authentication integration. Each SDK handles OAuth 2.0 flows, token management, session validation, and API interactions with Scalekit's platform.
+
+## Available SDKs
+
+Scalekit maintains SDKs for the following languages and platforms:
+
+### Node.js SDK
+
+Official SDK for Node.js applications with support for Express, Next.js, and other frameworks. Supports OIDC and SAML SSO with helpers for common auth tasks.
+
+**Key features:**
+- OAuth 2.0 authorization flows
+- Token validation and refresh
+- Organization and connection management
+- Admin portal integration
+- TypeScript support
+
+[View Node.js SDK documentation](/sdks/nodejs/)
+
+### Python SDK
+
+Official Python SDK with integrations for FastAPI, Django, and Flask. Provides helpers to implement SSO and secure sessions.
+
+**Key features:**
+- OAuth 2.0 and SAML support
+- Framework-specific middleware
+- Session management utilities
+- Type hints for better IDE support
+- Async/await support
+
+[View Python SDK documentation](/sdks/python/)
+
+### Go SDK
+
+Official Go SDK for building high-performance authentication services. Provides utilities for token validation and secure service endpoints.
+
+**Key features:**
+- Context-aware API calls
+- Concurrent request handling
+- Token validation helpers
+- Idiomatic Go patterns
+- Comprehensive error handling
+
+[View Go SDK documentation](/sdks/go/)
+
+### Java SDK
+
+Official Java SDK with Spring Boot support for enterprise authentication. Streamlines secure login and session handling.
+
+**Key features:**
+- Spring Boot integration
+- Enterprise-grade security
+- Session interceptors
+- Maven and Gradle support
+- Comprehensive documentation
+
+[View Java SDK documentation](/sdks/java/)
+
+### Expo SDK
+
+Official SDK for React Native applications built with Expo. Enables mobile authentication flows with native capabilities.
+
+**Key features:**
+- React Native integration
+- Native browser support
+- Secure token storage
+- Deep linking support
+- Cross-platform compatibility
+
+[View Expo SDK documentation](/sdks/expo/)
+
+## Feature Comparison
+
+All SDKs provide core authentication functionality with language-specific optimizations:
+
+| Feature | Node.js | Python | Go | Java | Expo |
+|---------|---------|--------|-----|------|------|
+| OAuth 2.0 / OIDC | ✓ | ✓ | ✓ | ✓ | ✓ |
+| SAML SSO | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Token validation | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Token refresh | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Organization management | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Connection management | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Admin portal | ✓ | ✓ | ✓ | ✓ | - |
+| Session management | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Directory sync (SCIM) | ✓ | ✓ | ✓ | ✓ | - |
+| TypeScript/Type hints | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Framework integrations | Express, Next.js | FastAPI, Django, Flask | Gin, Echo | Spring Boot | React Native |
+
+## Quick Start
+
+All SDKs follow a similar initialization pattern:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+import { Scalekit } from '@scalekit-sdk/node';
+
+const scalekit = new Scalekit(
+  process.env.SCALEKIT_ENVIRONMENT_URL,
+  process.env.SCALEKIT_CLIENT_ID,
+  process.env.SCALEKIT_CLIENT_SECRET
+);
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+from scalekit import ScalekitClient
+import os
+
+scalekit_client = ScalekitClient(
+    os.environ.get('SCALEKIT_ENVIRONMENT_URL'),
+    os.environ.get('SCALEKIT_CLIENT_ID'),
+    os.environ.get('SCALEKIT_CLIENT_SECRET')
+)
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+import (
+    "os"
+    "github.com/scalekit-inc/scalekit-sdk-go"
+)
+
+scalekitClient, err := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+if err != nil {
+    panic(err)
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENVIRONMENT_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+```
+  </TabItem>
+</Tabs>
+
+## Common Workflows
+
+All SDKs support these core authentication workflows:
+
+**User Login Flow:**
+1. Generate authorization URL
+2. Redirect user to Scalekit
+3. Handle callback with authorization code
+4. Exchange code for tokens
+5. Store tokens securely
+
+**Session Management:**
+1. Validate access tokens on requests
+2. Refresh tokens when expired
+3. Manage session lifecycle
+4. Handle logout and revocation
+
+**Organization Management:**
+1. Create and manage organizations
+2. Configure SSO connections
+3. Generate admin portal links
+4. Manage user memberships
+
+## SDK Support
+
+All Scalekit SDKs are:
+- **Open source** - Available on GitHub with MIT license
+- **Actively maintained** - Regular updates and security patches
+- **Well documented** - Comprehensive guides and API references
+- **Production ready** - Used by thousands of applications
+
+## GitHub Repositories
+
+- [Node.js SDK](https://github.com/scalekit-inc/scalekit-sdk-node)
+- [Python SDK](https://github.com/scalekit-inc/scalekit-sdk-python)
+- [Go SDK](https://github.com/scalekit-inc/scalekit-sdk-go)
+- [Java SDK](https://github.com/scalekit-inc/scalekit-sdk-java)
+
+## Next Steps
+
+- [Install an SDK](/sdks/installation/)
+- [Configure SDK credentials](/sdks/configuration/)
+- [Explore code examples](/sdks/examples/)
+- [Learn error handling](/sdks/error-handling/)

@@ -1,0 +1,43 @@
+---
+title: SSO integration
+description: Add enterprise single sign-on to your application
+---
+
+Enable enterprise customers to authenticate using their corporate identity provider via SAML or OIDC.
+
+## What is SSO
+
+Single sign-on (SSO) allows users to authenticate using their organization's identity provider instead of creating separate credentials.
+
+## Supported protocols
+
+- **SAML 2.0**: Industry standard for enterprise SSO
+- **OIDC**: Modern OAuth 2.0-based authentication
+
+## Supported identity providers
+
+- Okta
+- Azure AD / Microsoft Entra ID
+- Google Workspace
+- JumpCloud
+- OneLogin
+- Any SAML 2.0 or OIDC provider
+
+## Implementation
+
+See the complete [Modular SSO quickstart](/products/modular-sso) for implementation details.
+
+## Testing SSO
+
+Use the built-in IdP Simulator to test SSO flows before deploying to production.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SCIM provisioning" icon="users-gear" href="/guides/scim-provisioning">
+    Automate user management
+  </Card>
+  <Card title="SSO API" icon="code" href="/api/sso/connections">
+    SSO connections API reference
+  </Card>
+</CardGroup>

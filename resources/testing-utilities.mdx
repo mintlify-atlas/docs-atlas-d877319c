@@ -1,0 +1,49 @@
+---
+title: Testing utilities
+description: Tools and utilities for testing authentication flows
+---
+
+Scalekit provides testing tools to validate your authentication implementation.
+
+## IdP Simulator
+
+Built-in identity provider simulator for testing SSO flows without configuring a real IdP.
+
+**Features**:
+- Simulates SAML and OIDC providers
+- Test different user scenarios
+- Customize user attributes
+- Test error conditions
+
+**Usage**:
+1. Use test organization in development environment
+2. Initiate SSO with `@example.com` email
+3. IdP Simulator displays test login page
+4. Enter test credentials to complete flow
+
+## Test credentials
+
+Use these credentials with the IdP Simulator:
+
+- **Email**: Any email with `@example.com` or `@example.org`
+- **Password**: Any value (simulator accepts all passwords)
+
+## Testing environments
+
+Scalekit provides separate environments:
+
+- **Development**: For development and testing
+- **Production**: For live applications
+
+Each environment has separate API credentials and configurations.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SSO Simulator" icon="server" href="/resources/sso-simulator">
+    SSO testing tool
+  </Card>
+  <Card title="API collections" icon="folder" href="/resources/api-collections">
+    Postman collections
+  </Card>
+</CardGroup>

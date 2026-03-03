@@ -1,0 +1,465 @@
+---
+title: 'Python SDK'
+description: 'Official Python SDK with integrations for FastAPI, Django, and Flask to implement SSO and secure sessions'
+sidebar:
+  label: 'Python'
+  order: 3
+---
+
+The official Python SDK provides helpers and integrations for FastAPI, Django, and Flask to implement SSO and secure sessions with Scalekit.
+
+## Installation
+
+Install the SDK using pip:
+
+```bash
+pip install scalekit-sdk-python
+```
+
+## Quick Start
+
+Initialize the Scalekit client with your environment credentials:
+
+```python title="utils/auth.py"
+from scalekit import ScalekitClient, AuthorizationUrlOptions, CodeAuthenticationOptions
+import os
+
+scalekit_client = ScalekitClient(
+    os.environ.get('SCALEKIT_ENVIRONMENT_URL'),
+    os.environ.get('SCALEKIT_CLIENT_ID'),
+    os.environ.get('SCALEKIT_CLIENT_SECRET')
+)
+```
+
+**Security:** Store credentials in environment variables, never hard-code secrets in your application code.
+
+## Core Methods
+
+### Generate Authorization URL
+
+Create an authorization URL to redirect users to Scalekit:
+
+```python title="Login route"
+from scalekit import AuthorizationUrlOptions
+
+redirect_uri = 'https://yourapp.com/auth/callback'
+options = AuthorizationUrlOptions(
+    scopes=['openid', 'profile', 'email', 'offline_access'],
+    state=generate_secure_state()  # For CSRF protection
+)
+
+url = scalekit_client.get_authorization_url(redirect_uri, options)
+return redirect(url)
+```
+
+### Exchange Authorization Code
+
+Exchange the authorization code for tokens:
+
+```python title="Callback handler"
+from flask import request, redirect
+from scalekit import CodeAuthenticationOptions
+
+@app.route('/auth/callback')
+def auth_callback():
+    code = request.args.get('code')
+    error = request.args.get('error')
+
+    if error:
+        return redirect('/login?error=auth_failed')
+
+    try:
+        options = CodeAuthenticationOptions()
+        auth_result = scalekit_client.authenticate_with_code(
+            code,
+            'https://yourapp.com/auth/callback',
+            options
+        )
+
+        user = auth_result.user
+        access_token = auth_result.access_token
+        refresh_token = auth_result.refresh_token
+
+        # Store tokens securely
+        session['user'] = user
+        return redirect('/dashboard')
+
+    except Exception as e:
+        print(f'Authentication failed: {e}')
+        return redirect('/login?error=exchange_failed')
+```
+
+### Validate Access Token
+
+Validate access tokens in middleware or decorators:
+
+```python title="Middleware"
+from flask import request, jsonify
+from functools import wraps
+
+def verify_token(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        access_token = request.cookies.get('accessToken')
+
+        if not access_token:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        try:
+            is_valid = scalekit_client.validate_access_token(access_token)
+
+            if not is_valid:
+                return jsonify({'error': 'Invalid token'}), 401
+
+            return f(*args, **kwargs)
+
+        except Exception:
+            return jsonify({'error': 'Authentication failed'}), 401
+
+    return decorated_function
+```
+
+### Refresh Access Token
+
+Refresh expired tokens transparently:
+
+```python title="Token refresh"
+try:
+    auth_result = scalekit_client.refresh_access_token(refresh_token)
+
+    # Update stored tokens
+    response.set_cookie(
+        'accessToken',
+        auth_result.access_token,
+        max_age=auth_result.expires_in - 60,
+        httponly=True,
+        secure=True,
+        samesite='Strict'
+    )
+except Exception as e:
+    print(f'Token refresh failed: {e}')
+    return redirect('/login')
+```
+
+## Organization Management
+
+### Create Organization
+
+Create organizations for enterprise customers:
+
+```python
+from scalekit.v1.organizations.organizations_pb2 import CreateOrganization
+
+organization = scalekit_client.organization.create_organization(
+    CreateOrganization(
+        display_name='Acme Corp',
+        external_id='org_12345',
+    )
+)
+
+print(f'Organization created: {organization.id}')
+```
+
+### Generate Admin Portal Link
+
+Generate portal links for SSO configuration:
+
+```python
+link = scalekit_client.organization.generate_portal_link(organization_id)
+
+# Use link.location for iframe or shareable URL
+return jsonify({'portal_url': link.location})
+```
+
+## Session Management
+
+### Get Session Details
+
+Retrieve session information:
+
+```python
+session_details = scalekit_client.session.get_session(
+    session_id='ses_1234567890123456'
+)
+print(f'Session: {session_details}')
+```
+
+### List User Sessions
+
+List all sessions for a user:
+
+```python
+from google.protobuf.timestamp_pb2 import Timestamp
+from datetime import datetime
+
+start_time = Timestamp()
+start_time.FromDatetime(datetime(2025, 1, 1))
+end_time = Timestamp()
+end_time.FromDatetime(datetime(2025, 12, 31))
+
+filter_obj = scalekit_client.session.create_session_filter(
+    status=['ACTIVE'],
+    start_time=start_time,
+    end_time=end_time
+)
+
+user_sessions = scalekit_client.session.get_user_sessions(
+    user_id='usr_1234567890123456',
+    page_size=10,
+    filter=filter_obj
+)
+```
+
+### Revoke Session
+
+Revoke specific sessions:
+
+```python
+revoked_session = scalekit_client.session.revoke_session(
+    session_id='ses_1234567890123456'
+)
+print('Session revoked')
+```
+
+### Revoke All User Sessions
+
+Logout from all devices:
+
+```python
+revoked_sessions = scalekit_client.session.revoke_all_user_sessions(
+    user_id='usr_1234567890123456'
+)
+print('All sessions revoked')
+```
+
+## Advanced Features
+
+### Custom Authorization Options
+
+Customize authorization with additional parameters:
+
+```python
+from scalekit import AuthorizationUrlOptions
+
+options = AuthorizationUrlOptions(
+    scopes=['openid', 'profile', 'email', 'offline_access'],
+    organization_id='org_123',      # Route to specific organization
+    connection_id='conn_456',       # Route to specific connection
+    login_hint='user@example.com',  # Pre-fill email
+    prompt='login',                 # Force re-authentication
+    state=generate_state()          # CSRF protection
+)
+
+url = scalekit_client.get_authorization_url(redirect_uri, options)
+```
+
+### Error Handling
+
+Handle SDK exceptions appropriately:
+
+```python
+try:
+    result = scalekit_client.authenticate_with_code(code, redirect_uri, options)
+except Exception as error:
+    if 'invalid_grant' in str(error):
+        # Authorization code expired or already used
+        return redirect('/login?error=code_expired')
+
+    if 'invalid_client' in str(error):
+        # Invalid credentials
+        print('SDK configuration error')
+
+    # Handle other errors
+    print(f'Authentication error: {error}')
+```
+
+## Framework Examples
+
+### Flask
+
+Complete Flask integration:
+
+```python title="app.py"
+from flask import Flask, session, redirect, request, jsonify
+from scalekit import ScalekitClient, AuthorizationUrlOptions
+import os
+
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY')
+
+scalekit_client = ScalekitClient(
+    os.environ.get('SCALEKIT_ENVIRONMENT_URL'),
+    os.environ.get('SCALEKIT_CLIENT_ID'),
+    os.environ.get('SCALEKIT_CLIENT_SECRET')
+)
+
+@app.route('/login')
+def login():
+    state = generate_state()
+    session['oauth_state'] = state
+
+    options = AuthorizationUrlOptions(
+        scopes=['openid', 'profile', 'email'],
+        state=state
+    )
+
+    url = scalekit_client.get_authorization_url(
+        'https://yourapp.com/auth/callback',
+        options
+    )
+
+    return redirect(url)
+
+@app.route('/auth/callback')
+def callback():
+    code = request.args.get('code')
+    state = request.args.get('state')
+
+    if state != session.get('oauth_state'):
+        return 'Invalid state', 400
+
+    from scalekit import CodeAuthenticationOptions
+    options = CodeAuthenticationOptions()
+
+    auth_result = scalekit_client.authenticate_with_code(
+        code,
+        'https://yourapp.com/auth/callback',
+        options
+    )
+
+    session['user'] = auth_result.user
+    return redirect('/dashboard')
+```
+
+### FastAPI
+
+FastAPI integration example:
+
+```python title="main.py"
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import RedirectResponse
+from scalekit import ScalekitClient, AuthorizationUrlOptions, CodeAuthenticationOptions
+import os
+
+app = FastAPI()
+
+scalekit_client = ScalekitClient(
+    os.environ.get('SCALEKIT_ENVIRONMENT_URL'),
+    os.environ.get('SCALEKIT_CLIENT_ID'),
+    os.environ.get('SCALEKIT_CLIENT_SECRET')
+)
+
+@app.get('/login')
+async def login(request: Request):
+    options = AuthorizationUrlOptions(
+        scopes=['openid', 'profile', 'email']
+    )
+
+    url = scalekit_client.get_authorization_url(
+        'https://yourapp.com/auth/callback',
+        options
+    )
+
+    return RedirectResponse(url)
+
+@app.get('/auth/callback')
+async def callback(code: str, response: Response):
+    options = CodeAuthenticationOptions()
+
+    auth_result = scalekit_client.authenticate_with_code(
+        code,
+        'https://yourapp.com/auth/callback',
+        options
+    )
+
+    # Set secure cookie
+    response.set_cookie(
+        key='accessToken',
+        value=auth_result.access_token,
+        httponly=True,
+        secure=True,
+        samesite='strict'
+    )
+
+    return RedirectResponse('/dashboard')
+```
+
+### Django
+
+Django views example:
+
+```python title="views.py"
+from django.shortcuts import redirect
+from django.http import HttpResponse
+from scalekit import ScalekitClient, AuthorizationUrlOptions, CodeAuthenticationOptions
+import os
+
+scalekit_client = ScalekitClient(
+    os.environ.get('SCALEKIT_ENVIRONMENT_URL'),
+    os.environ.get('SCALEKIT_CLIENT_ID'),
+    os.environ.get('SCALEKIT_CLIENT_SECRET')
+)
+
+def login(request):
+    options = AuthorizationUrlOptions(
+        scopes=['openid', 'profile', 'email']
+    )
+
+    url = scalekit_client.get_authorization_url(
+        'https://yourapp.com/auth/callback',
+        options
+    )
+
+    return redirect(url)
+
+def callback(request):
+    code = request.GET.get('code')
+
+    options = CodeAuthenticationOptions()
+    auth_result = scalekit_client.authenticate_with_code(
+        code,
+        'https://yourapp.com/auth/callback',
+        options
+    )
+
+    request.session['user'] = auth_result.user
+    return redirect('/dashboard')
+```
+
+## Type Hints
+
+The SDK includes type hints for better IDE support:
+
+```python
+from scalekit import (
+    ScalekitClient,
+    AuthorizationUrlOptions,
+    CodeAuthenticationOptions,
+    AuthenticationResponse
+)
+
+scalekit_client: ScalekitClient = ScalekitClient(
+    os.environ.get('SCALEKIT_ENVIRONMENT_URL'),
+    os.environ.get('SCALEKIT_CLIENT_ID'),
+    os.environ.get('SCALEKIT_CLIENT_SECRET')
+)
+
+options: AuthorizationUrlOptions = AuthorizationUrlOptions(
+    scopes=['openid', 'profile', 'email']
+)
+
+auth_result: AuthenticationResponse = scalekit_client.authenticate_with_code(
+    code,
+    redirect_uri,
+    options
+)
+```
+
+## Resources
+
+- [GitHub Repository](https://github.com/scalekit-inc/scalekit-sdk-python)
+- [PyPI Package](https://pypi.org/project/scalekit-sdk-python/)
+- [Installation Guide](/sdks/installation/)
+- [Configuration Guide](/sdks/configuration/)
+- [Error Handling](/sdks/error-handling/)
+- [Code Examples](/sdks/examples/)

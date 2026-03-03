@@ -1,0 +1,43 @@
+---
+title: SCIM provisioning
+description: Automate user lifecycle management with SCIM 2.0
+---
+
+SCIM (System for Cross-domain Identity Management) automates user and group provisioning from enterprise directory providers.
+
+## Benefits
+
+- Automatic user creation and updates
+- Group-based role assignment
+- Automated deprovisioning
+- Profile attribute synchronization
+
+## How SCIM works
+
+1. Customer configures SCIM in their IdP
+2. IdP syncs users and groups to Scalekit
+3. Scalekit creates/updates users in your application
+4. Role assignments based on group mappings
+
+## Supported providers
+
+- Okta
+- Azure AD / Microsoft Entra ID
+- Google Workspace
+- JumpCloud
+- OneLogin
+
+## Setup
+
+Enable SCIM provisioning in **Dashboard > Organizations > [Organization] > Directory**
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Organizations" icon="building" href="/concepts/organizations-users">
+    Understanding organizations and users
+  </Card>
+  <Card title="SCIM API" icon="code" href="/api/scim/users">
+    SCIM API reference
+  </Card>
+</CardGroup>

@@ -1,0 +1,154 @@
+---
+title: Troubleshooting
+description: Common issues and solutions
+---
+
+Solutions to common authentication issues.
+
+## Authentication errors
+
+### Invalid redirect URI
+
+**Error**: `redirect_uri_mismatch`
+
+**Solution**: Ensure redirect URI in code matches dashboard configuration exactly:
+
+```javascript
+// Must match dashboard setting
+const redirectUri = 'https://app.example.com/auth/callback';
+```
+
+### Invalid client credentials
+
+**Error**: `invalid_client`
+
+**Solution**: Verify environment variables:
+
+```bash
+SCALEKIT_CLIENT_ID=skc_...
+SCALEKIT_CLIENT_SECRET=sk_...
+SCALEKIT_ENVIRONMENT_URL=https://...
+```
+
+### Token expired
+
+**Error**: `token_expired`
+
+**Solution**: Implement token refresh:
+
+```javascript
+if (!isValid && refreshToken) {
+  const authResult = await scalekit.refreshAccessToken(refreshToken);
+  // Update stored tokens
+}
+```
+
+## SSO issues
+
+### SSO connection not found
+
+**Error**: `connection_not_found`
+
+**Solution**: Verify organization has active SSO connection:
+
+```javascript
+const connections = await scalekit.connections.list(organizationId);
+console.log(connections);
+```
+
+### SAML assertion validation failed
+
+**Error**: `saml_validation_failed`
+
+**Solution**: Check SAML configuration:
+
+- Verify certificate is correct
+- Check SSO URL matches IdP
+- Ensure entity ID is correct
+
+### IdP-initiated SSO fails
+
+**Error**: `invalid_saml_request`
+
+**Solution**: Configure initiate login URL in dashboard.
+
+## Session issues
+
+### Session expires too quickly
+
+**Solution**: Configure session policy in dashboard:
+
+- Increase absolute timeout
+- Disable idle timeout
+- Increase access token lifetime
+
+### Cannot refresh token
+
+**Error**: `invalid_grant`
+
+**Solution**: Ensure refresh token is valid and not expired:
+
+```javascript
+try {
+  const authResult = await scalekit.refreshAccessToken(refreshToken);
+} catch (error) {
+  // Refresh token expired - require re-authentication
+  res.redirect('/login');
+}
+```
+
+## SCIM issues
+
+### Users not provisioning
+
+**Check**:
+- SCIM bearer token is valid
+- User email domain matches organization
+- SCIM connection is enabled
+
+### Group sync not working
+
+**Check**:
+- Groups are assigned in IdP
+- Group mapping is configured
+- SCIM sync is enabled
+
+## Webhook issues
+
+### Webhooks not received
+
+**Check**:
+- Webhook URL is accessible
+- HTTPS is configured
+- Firewall allows Scalekit IPs
+
+### Signature verification fails
+
+**Solution**: Verify webhook secret:
+
+```javascript
+const isValid = verifySignature(
+  req.body,
+  req.headers['x-scalekit-signature'],
+  process.env.WEBHOOK_SECRET
+);
+```
+
+## Getting help
+
+If you continue to experience issues:
+
+1. Check [documentation](/introduction)
+2. Review [code samples](/resources/code-samples)
+3. Contact support at support@scalekit.com
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Testing utilities" icon="flask" href="/resources/testing-utilities">
+    Testing tools
+  </Card>
+  <Card title="Code samples" icon="code" href="/resources/code-samples">
+    Example implementations
+  </Card>
+</CardGroup>

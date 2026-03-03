@@ -1,0 +1,191 @@
+---
+title: Authentication best practices
+description: Security best practices for authentication implementation
+---
+
+Follow these security best practices when implementing authentication.
+
+## Credential management
+
+### Never hardcode secrets
+
+```javascript
+// BAD
+const scalekit = new Scalekit(
+  'https://auth.scalekit.com',
+  'skc_hardcoded_client_id',
+  'hardcoded_secret'
+);
+
+// GOOD
+const scalekit = new Scalekit(
+  process.env.SCALEKIT_ENVIRONMENT_URL,
+  process.env.SCALEKIT_CLIENT_ID,
+  process.env.SCALEKIT_CLIENT_SECRET
+);
+```
+
+### Use environment variables
+
+```bash
+# .env file
+SCALEKIT_ENVIRONMENT_URL=https://auth.scalekit.com
+SCALEKIT_CLIENT_ID=skc_...
+SCALEKIT_CLIENT_SECRET=sk_...
+
+# Never commit .env to version control
+# Add to .gitignore
+```
+
+## HTTPS everywhere
+
+- **Development**: Use localhost or mkcert
+- **Production**: TLS 1.2 or higher required
+- **Certificates**: Use Let's Encrypt or commercial CA
+- **HSTS**: Enable HTTP Strict Transport Security
+
+```javascript
+app.use((req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+```
+
+## CSRF protection
+
+### SameSite cookies
+
+```javascript
+res.cookie('sessionToken', token, {
+  sameSite: 'strict',
+  secure: true,
+  httpOnly: true
+});
+```
+
+### CSRF tokens
+
+```javascript
+const csrf = require('csurf');
+const csrfProtection = csrf({ cookie: true });
+
+app.post('/api/sensitive', csrfProtection, (req, res) => {
+  // Protected endpoint
+});
+```
+
+## XSS prevention
+
+### HttpOnly cookies
+
+```javascript
+res.cookie('token', value, {
+  httpOnly: true  // Prevents JavaScript access
+});
+```
+
+### Content Security Policy
+
+```javascript
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self'");
+  next();
+});
+```
+
+### Input validation
+
+```javascript
+const validator = require('validator');
+
+function validateEmail(email) {
+  if (!validator.isEmail(email)) {
+    throw new Error('Invalid email');
+  }
+  return validator.normalizeEmail(email);
+}
+```
+
+## Rate limiting
+
+```javascript
+const rateLimit = require('express-rate-limit');
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'Too many login attempts'
+});
+
+app.post('/login', loginLimiter, loginHandler);
+```
+
+## Secure redirects
+
+### Validate redirect URLs
+
+```javascript
+const allowedRedirects = [
+  'https://app.example.com',
+  'https://example.com'
+];
+
+function validateRedirect(url) {
+  const parsed = new URL(url);
+  return allowedRedirects.includes(parsed.origin);
+}
+
+if (!validateRedirect(req.query.redirect)) {
+  throw new Error('Invalid redirect URL');
+}
+```
+
+## Error handling
+
+### Generic error messages
+
+```javascript
+// BAD - Leaks information
+if (!user) {
+  return res.status(401).json({ error: 'User not found' });
+}
+if (!validPassword) {
+  return res.status(401).json({ error: 'Invalid password' });
+}
+
+// GOOD - Generic message
+if (!user || !validPassword) {
+  return res.status(401).json({ error: 'Invalid credentials' });
+}
+```
+
+## Logging and monitoring
+
+### Log authentication events
+
+```javascript
+logger.info('Login attempt', {
+  userId: user.id,
+  ip: req.ip,
+  userAgent: req.headers['user-agent'],
+  success: true
+});
+```
+
+### Monitor for threats
+
+- Failed login attempts
+- Token refresh failures
+- Unusual access patterns
+- Geographic anomalies
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Token management" icon="key" href="/security/token-management">
+    Secure token handling
+  </Card>
+  <Card title="Session policies" icon="shield" href="/security/session-policies">
+    Configure session security
+  </Card>
+</CardGroup>

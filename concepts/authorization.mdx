@@ -1,0 +1,371 @@
+---
+title: Authorization
+description: Implement role-based access control and permissions in your application
+---
+
+Authorization determines what authenticated users can do in your application. Scalekit provides flexible authorization mechanisms through roles, permissions, and access tokens.
+
+## Authentication vs authorization
+
+- **Authentication**: Verifies who the user is (handled by Scalekit)
+- **Authorization**: Determines what the user can do (enforced by your application)
+
+Scalekit provides the claims and data needed to make authorization decisions in your application.
+
+## Access token claims
+
+Access tokens contain authorization information:
+
+```json
+{
+  "sub": "usr_1234567890",              // User ID
+  "oid": "org_1234567890",              // Organization ID
+  "roles": ["admin", "editor"],        // User roles
+  "permissions": [                     // Granted permissions
+    "read:documents",
+    "write:documents",
+    "delete:documents"
+  ],
+  "exp": 1234567890,
+  "iat": 1234567890
+}
+```
+
+## Role-based access control (RBAC)
+
+Roles group permissions together for easier management.
+
+### Defining roles
+
+Define roles in your Scalekit dashboard or via API:
+
+<CodeGroup>
+
+```javascript Node.js
+const role = await scalekit.roles.create({
+  name: 'editor',
+  displayName: 'Editor',
+  description: 'Can create and edit content',
+  permissions: [
+    'read:documents',
+    'write:documents',
+    'comment:documents'
+  ]
+});
+```
+
+```python Python
+role = scalekit_client.roles.create(
+    name='editor',
+    display_name='Editor',
+    description='Can create and edit content',
+    permissions=[
+        'read:documents',
+        'write:documents',
+        'comment:documents'
+    ]
+)
+```
+
+```go Go
+role, err := scalekitClient.Roles().Create(ctx, &scalekit.CreateRoleRequest{
+    Name: "editor",
+    DisplayName: "Editor",
+    Description: "Can create and edit content",
+    Permissions: []string{
+        "read:documents",
+        "write:documents",
+        "comment:documents",
+    },
+})
+```
+
+```java Java
+Role role = scalekitClient.roles().create(
+    new CreateRoleRequest()
+        .setName("editor")
+        .setDisplayName("Editor")
+        .setDescription("Can create and edit content")
+        .setPermissions(List.of(
+            "read:documents",
+            "write:documents",
+            "comment:documents"
+        ))
+);
+```
+
+</CodeGroup>
+
+### Assigning roles
+
+Assign roles to users within organizations:
+
+<CodeGroup>
+
+```javascript Node.js
+await scalekit.organization.assignRole(
+  organizationId,
+  userId,
+  'editor'
+);
+```
+
+```python Python
+scalekit_client.organization.assign_role(
+    organization_id,
+    user_id,
+    'editor'
+)
+```
+
+```go Go
+err := scalekitClient.Organization().AssignRole(
+    ctx,
+    organizationId,
+    userId,
+    "editor"
+)
+```
+
+```java Java
+scalekitClient.organizations().assignRole(
+    organizationId,
+    userId,
+    "editor"
+);
+```
+
+</CodeGroup>
+
+### Checking roles
+
+Validate user roles in your application:
+
+```javascript
+const token = await scalekit.validateAccessToken(accessToken);
+
+if (token.roles.includes('admin')) {
+  // Grant admin access
+} else if (token.roles.includes('editor')) {
+  // Grant editor access
+} else {
+  // Default member access
+}
+```
+
+## Permission-based access control
+
+Permissions provide fine-grained access control.
+
+### Permission naming
+
+Use a consistent naming convention:
+
+- **Format**: `<action>:<resource>`
+- **Examples**:
+  - `read:documents`
+  - `write:documents`
+  - `delete:documents`
+  - `manage:users`
+  - `admin:organization`
+
+### Checking permissions
+
+Validate permissions before sensitive operations:
+
+```javascript
+const token = await scalekit.validateAccessToken(accessToken);
+
+if (token.permissions.includes('delete:documents')) {
+  // Allow document deletion
+  await deleteDocument(documentId);
+} else {
+  throw new ForbiddenError('Missing delete:documents permission');
+}
+```
+
+### Middleware for permission checks
+
+Create reusable middleware for route protection:
+
+```javascript
+function requirePermission(permission) {
+  return async (req, res, next) => {
+    const token = await scalekit.validateAccessToken(req.cookies.accessToken);
+    
+    if (!token.permissions.includes(permission)) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: `Missing required permission: ${permission}`
+      });
+    }
+    
+    req.user = token;
+    next();
+  };
+}
+
+// Use in routes
+app.delete('/api/documents/:id', 
+  requirePermission('delete:documents'),
+  async (req, res) => {
+    // Delete document
+  }
+);
+```
+
+## Organization-scoped authorization
+
+Authorize actions within specific organizations:
+
+```javascript
+const token = await scalekit.validateAccessToken(accessToken);
+
+// Verify user belongs to the organization
+if (token.oid !== requestedOrganizationId) {
+  throw new ForbiddenError('User does not belong to this organization');
+}
+
+// Verify user has required role in the organization
+const userRole = await scalekit.organization.getUserRole(
+  token.oid,
+  token.sub
+);
+
+if (!['admin', 'owner'].includes(userRole)) {
+  throw new ForbiddenError('Insufficient permissions');
+}
+```
+
+## Group-based authorization
+
+Map directory groups to application roles via SCIM:
+
+### Group mapping
+
+Configure group-to-role mappings in your dashboard:
+
+| Directory group | Application role |
+|----------------|------------------|
+| Engineering | developer |
+| Engineering-Leads | admin |
+| Sales | viewer |
+
+### Automatic role assignment
+
+When users are provisioned via SCIM:
+1. Directory groups are synced to Scalekit
+2. Group memberships are evaluated
+3. Corresponding roles are automatically assigned
+4. Access token includes mapped roles and permissions
+
+## Attribute-based access control (ABAC)
+
+Use custom user attributes for dynamic authorization:
+
+```javascript
+const token = await scalekit.validateAccessToken(accessToken);
+const user = await scalekit.user.get(token.sub);
+
+// Check user attributes
+if (user.metadata.department === 'finance' && 
+    user.metadata.clearanceLevel >= 3) {
+  // Grant access to financial reports
+}
+```
+
+## Multi-tenant authorization
+
+Ensure data isolation between organizations:
+
+```javascript
+async function getDocument(documentId, accessToken) {
+  // Validate token and extract organization
+  const token = await scalekit.validateAccessToken(accessToken);
+  
+  // Fetch document
+  const document = await db.documents.findById(documentId);
+  
+  // Verify document belongs to user's organization
+  if (document.organizationId !== token.oid) {
+    throw new ForbiddenError('Document not found');
+  }
+  
+  // Check read permission
+  if (!token.permissions.includes('read:documents')) {
+    throw new ForbiddenError('Insufficient permissions');
+  }
+  
+  return document;
+}
+```
+
+## Best practices
+
+### Principle of least privilege
+
+Grant minimum permissions required:
+
+- Start with restrictive defaults
+- Add permissions as needed
+- Review and audit permissions regularly
+- Remove unused permissions
+
+### Defense in depth
+
+Implement authorization at multiple layers:
+
+1. **API Gateway**: Basic token validation
+2. **Application middleware**: Role/permission checks
+3. **Business logic**: Resource-level authorization
+4. **Database**: Row-level security policies
+
+### Fail securely
+
+Default to denying access:
+
+```javascript
+function checkPermission(token, permission) {
+  // Fail closed - deny by default
+  if (!token || !token.permissions) {
+    return false;
+  }
+  
+  return token.permissions.includes(permission);
+}
+```
+
+### Audit authorization decisions
+
+Log authorization failures for security monitoring:
+
+```javascript
+if (!hasPermission) {
+  logger.warn('Authorization failed', {
+    userId: token.sub,
+    organizationId: token.oid,
+    requiredPermission: permission,
+    userPermissions: token.permissions,
+    resource: resourceId
+  });
+  
+  throw new ForbiddenError('Access denied');
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Organizations and users" icon="users" href="/concepts/organizations-users">
+    Understand multi-tenant user models
+  </Card>
+  <Card title="Session management" icon="clock" href="/concepts/session-management">
+    Learn about tokens and sessions
+  </Card>
+  <Card title="SCIM provisioning" icon="users-gear" href="/guides/scim-provisioning">
+    Automate role assignment with directory groups
+  </Card>
+  <Card title="Best practices" icon="shield" href="/security/authentication-best-practices">
+    Security best practices for authorization
+  </Card>
+</CardGroup>

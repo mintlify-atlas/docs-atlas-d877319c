@@ -1,0 +1,685 @@
+---
+title: 'Error Handling'
+description: 'Handle errors and exceptions in Scalekit SDKs with proper error patterns and recovery strategies'
+sidebar:
+  label: 'Error Handling'
+  order: 9
+---
+
+Understand how to handle errors and exceptions in Scalekit SDKs. Proper error handling ensures your application gracefully handles authentication failures, network issues, and invalid requests.
+
+## Common Error Types
+
+Scalekit SDKs return errors in these categories:
+
+| Error Type | Description | Recovery Strategy |
+|------------|-------------|------------------|
+| **Authentication Errors** | Invalid credentials, expired codes | Redirect to login, refresh tokens |
+| **Validation Errors** | Invalid parameters, missing fields | Fix request parameters |
+| **Network Errors** | Timeout, connection failures | Retry with exponential backoff |
+| **Configuration Errors** | Invalid SDK setup | Check environment variables |
+| **Authorization Errors** | Insufficient permissions | Request proper scopes |
+
+## Error Response Format
+
+Errors include these properties:
+
+```json
+{
+  "error": "invalid_grant",
+  "error_description": "Authorization code has expired",
+  "status": 400
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `error` | Error code identifier |
+| `error_description` | Human-readable error message |
+| `status` | HTTP status code |
+
+## Authentication Errors
+
+### Invalid Grant
+
+Authorization code expired or already used:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+try {
+  const authResult = await scalekit.authenticateWithCode(code, redirectUri);
+} catch (error) {
+  if (error.code === 'invalid_grant') {
+    // Code expired or already used - start new login flow
+    console.log('Authorization code invalid, redirecting to login');
+    return res.redirect('/login?error=code_expired');
+  }
+  throw error;
+}
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+try:
+    auth_result = scalekit_client.authenticate_with_code(
+        code, redirect_uri, options
+    )
+except Exception as error:
+    if 'invalid_grant' in str(error):
+        # Code expired or already used - start new login flow
+        print('Authorization code invalid, redirecting to login')
+        return redirect('/login?error=code_expired')
+    raise
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+authResult, err := scalekitClient.AuthenticateWithCode(
+    ctx, code, redirectUri, options,
+)
+if err != nil {
+    if errors.Is(err, scalekit.ErrInvalidGrant) {
+        // Code expired or already used - start new login flow
+        log.Println("Authorization code invalid, redirecting to login")
+        return c.Redirect(http.StatusFound, "/login?error=code_expired")
+    }
+    return err
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+try {
+    AuthenticationResponse authResult = scalekitClient
+        .authentication()
+        .authenticateWithCode(code, redirectUri, options);
+} catch (ScalekitException e) {
+    if ("invalid_grant".equals(e.getErrorCode())) {
+        // Code expired or already used - start new login flow
+        System.out.println("Authorization code invalid, redirecting to login");
+        return new RedirectView("/login?error=code_expired");
+    }
+    throw e;
+}
+```
+  </TabItem>
+</Tabs>
+
+### Invalid Client
+
+Invalid client credentials:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+try {
+  const authResult = await scalekit.authenticateWithCode(code, redirectUri);
+} catch (error) {
+  if (error.code === 'invalid_client') {
+    // Invalid client ID or secret
+    console.error('SDK configuration error:', error.message);
+    console.error('Check SCALEKIT_CLIENT_ID and SCALEKIT_CLIENT_SECRET');
+    return res.status(500).json({ error: 'Configuration error' });
+  }
+  throw error;
+}
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+try:
+    auth_result = scalekit_client.authenticate_with_code(
+        code, redirect_uri, options
+    )
+except Exception as error:
+    if 'invalid_client' in str(error):
+        # Invalid client ID or secret
+        print(f'SDK configuration error: {error}')
+        print('Check SCALEKIT_CLIENT_ID and SCALEKIT_CLIENT_SECRET')
+        return jsonify({'error': 'Configuration error'}), 500
+    raise
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+authResult, err := scalekitClient.AuthenticateWithCode(
+    ctx, code, redirectUri, options,
+)
+if err != nil {
+    if errors.Is(err, scalekit.ErrInvalidClient) {
+        // Invalid client ID or secret
+        log.Printf("SDK configuration error: %v", err)
+        log.Println("Check SCALEKIT_CLIENT_ID and SCALEKIT_CLIENT_SECRET")
+        return c.JSON(http.StatusInternalServerError,
+            gin.H{"error": "Configuration error"})
+    }
+    return err
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+try {
+    AuthenticationResponse authResult = scalekitClient
+        .authentication()
+        .authenticateWithCode(code, redirectUri, options);
+} catch (ScalekitException e) {
+    if ("invalid_client".equals(e.getErrorCode())) {
+        // Invalid client ID or secret
+        System.err.println("SDK configuration error: " + e.getMessage());
+        System.err.println("Check SCALEKIT_CLIENT_ID and SCALEKIT_CLIENT_SECRET");
+        return ResponseEntity.status(500)
+            .body(Map.of("error", "Configuration error"));
+    }
+    throw e;
+}
+```
+  </TabItem>
+</Tabs>
+
+### Token Expired
+
+Access token has expired:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+try {
+  const isValid = await scalekit.validateAccessToken(accessToken);
+
+  if (!isValid) {
+    // Token expired - try to refresh
+    const refreshToken = req.cookies.refreshToken;
+
+    if (refreshToken) {
+      const authResult = await scalekit.refreshAccessToken(refreshToken);
+      // Update cookies with new tokens
+      return authResult.accessToken;
+    }
+
+    // No refresh token - redirect to login
+    return res.redirect('/login?error=session_expired');
+  }
+} catch (error) {
+  console.error('Token validation failed:', error);
+  return res.status(401).json({ error: 'Invalid token' });
+}
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+try:
+    is_valid = scalekit_client.validate_access_token(access_token)
+
+    if not is_valid:
+        # Token expired - try to refresh
+        refresh_token = request.cookies.get('refreshToken')
+
+        if refresh_token:
+            auth_result = scalekit_client.refresh_access_token(refresh_token)
+            # Update cookies with new tokens
+            return auth_result.access_token
+
+        # No refresh token - redirect to login
+        return redirect('/login?error=session_expired')
+
+except Exception as error:
+    print(f'Token validation failed: {error}')
+    return jsonify({'error': 'Invalid token'}), 401
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+isValid, err := scalekitClient.ValidateAccessToken(ctx, accessToken)
+
+if err != nil || !isValid {
+    // Token expired - try to refresh
+    refreshToken, err := c.Cookie("refreshToken")
+
+    if err == nil && refreshToken != "" {
+        authResult, err := scalekitClient.RefreshAccessToken(ctx, refreshToken)
+        if err == nil {
+            // Update cookies with new tokens
+            return authResult.AccessToken, nil
+        }
+    }
+
+    // No refresh token - redirect to login
+    return c.Redirect(http.StatusFound, "/login?error=session_expired")
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+try {
+    boolean isValid = scalekitClient.validateAccessToken(accessToken);
+
+    if (!isValid) {
+        // Token expired - try to refresh
+        String refreshToken = getCookieValue(request, "refreshToken");
+
+        if (refreshToken != null) {
+            AuthResult authResult = scalekitClient
+                .authentication()
+                .refreshToken(refreshToken);
+            // Update cookies with new tokens
+            return authResult.getAccessToken();
+        }
+
+        // No refresh token - redirect to login
+        return new RedirectView("/login?error=session_expired");
+    }
+} catch (Exception e) {
+    System.err.println("Token validation failed: " + e.getMessage());
+    return ResponseEntity.status(401).body(Map.of("error", "Invalid token"));
+}
+```
+  </TabItem>
+</Tabs>
+
+## Validation Errors
+
+### Missing Required Parameters
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+try {
+  if (!code) {
+    throw new Error('Missing authorization code');
+  }
+
+  const authResult = await scalekit.authenticateWithCode(code, redirectUri);
+} catch (error) {
+  if (error.message.includes('Missing')) {
+    console.error('Validation error:', error.message);
+    return res.redirect('/login?error=missing_code');
+  }
+  throw error;
+}
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+try:
+    if not code:
+        raise ValueError('Missing authorization code')
+
+    auth_result = scalekit_client.authenticate_with_code(
+        code, redirect_uri, options
+    )
+except ValueError as error:
+    print(f'Validation error: {error}')
+    return redirect('/login?error=missing_code')
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+if code == "" {
+    log.Println("Missing authorization code")
+    return c.Redirect(http.StatusFound, "/login?error=missing_code")
+}
+
+authResult, err := scalekitClient.AuthenticateWithCode(
+    ctx, code, redirectUri, options,
+)
+if err != nil {
+    log.Printf("Authentication error: %v", err)
+    return err
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+if (code == null || code.isEmpty()) {
+    System.err.println("Missing authorization code");
+    return new RedirectView("/login?error=missing_code");
+}
+
+try {
+    AuthenticationResponse authResult = scalekitClient
+        .authentication()
+        .authenticateWithCode(code, redirectUri, options);
+} catch (Exception e) {
+    System.err.println("Authentication error: " + e.getMessage());
+    throw e;
+}
+```
+  </TabItem>
+</Tabs>
+
+### Invalid State Parameter
+
+CSRF protection validation:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+const { code, state } = req.query;
+const storedState = req.session.oauthState;
+
+if (!state || state !== storedState) {
+  console.error('Invalid state parameter - possible CSRF attack');
+  return res.status(400).json({
+    error: 'invalid_state',
+    error_description: 'State parameter mismatch'
+  });
+}
+
+delete req.session.oauthState; // State should be used only once
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+state = request.args.get('state')
+stored_state = session.pop('oauth_state', None)
+
+if not state or state != stored_state:
+    print('Invalid state parameter - possible CSRF attack')
+    return jsonify({
+        'error': 'invalid_state',
+        'error_description': 'State parameter mismatch'
+    }), 400
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+stateParam := c.Query("state")
+session := sessions.Default(c)
+storedState := session.Get("oauth_state")
+session.Delete("oauth_state")
+session.Save()
+
+if stateParam == "" || stateParam != storedState {
+    log.Println("Invalid state parameter - possible CSRF attack")
+    return c.JSON(http.StatusBadRequest, gin.H{
+        "error":             "invalid_state",
+        "error_description": "State parameter mismatch",
+    })
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+String storedState = (String) session.getAttribute("oauth_state");
+session.removeAttribute("oauth_state");
+
+if (state == null || !state.equals(storedState)) {
+    System.err.println("Invalid state parameter - possible CSRF attack");
+    return ResponseEntity.status(400).body(Map.of(
+        "error", "invalid_state",
+        "error_description", "State parameter mismatch"
+    ));
+}
+```
+  </TabItem>
+</Tabs>
+
+## Network Errors
+
+### Connection Timeout
+
+Handle network timeouts with retry logic:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+async function authenticateWithRetry(code, redirectUri, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await scalekit.authenticateWithCode(code, redirectUri);
+    } catch (error) {
+      if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
+        if (attempt === maxRetries) {
+          console.error('Max retries reached, authentication failed');
+          throw new Error('Network error - please try again later');
+        }
+
+        // Exponential backoff
+        const delay = Math.pow(2, attempt) * 1000;
+        console.log(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+import time
+
+def authenticate_with_retry(code, redirect_uri, max_retries=3):
+    for attempt in range(1, max_retries + 1):
+        try:
+            return scalekit_client.authenticate_with_code(
+                code, redirect_uri, options
+            )
+        except Exception as error:
+            if 'timeout' in str(error).lower() or 'connection' in str(error).lower():
+                if attempt == max_retries:
+                    print('Max retries reached, authentication failed')
+                    raise Exception('Network error - please try again later')
+
+                # Exponential backoff
+                delay = (2 ** attempt)
+                print(f'Attempt {attempt} failed, retrying in {delay}s...')
+                time.sleep(delay)
+            else:
+                raise
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+import (
+    "context"
+    "time"
+    "math"
+)
+
+func authenticateWithRetry(
+    ctx context.Context,
+    code, redirectUri string,
+    maxRetries int,
+) (*scalekit.AuthenticationResponse, error) {
+    for attempt := 1; attempt <= maxRetries; attempt++ {
+        authResult, err := scalekitClient.AuthenticateWithCode(
+            ctx, code, redirectUri, scalekit.AuthenticationOptions{},
+        )
+
+        if err == nil {
+            return authResult, nil
+        }
+
+        if isNetworkError(err) {
+            if attempt == maxRetries {
+                return nil, fmt.Errorf("max retries reached: %w", err)
+            }
+
+            // Exponential backoff
+            delay := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+            log.Printf("Attempt %d failed, retrying in %v...", attempt, delay)
+            time.Sleep(delay)
+        } else {
+            return nil, err
+        }
+    }
+
+    return nil, fmt.Errorf("authentication failed after %d attempts", maxRetries)
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+import java.util.concurrent.TimeUnit;
+
+public AuthenticationResponse authenticateWithRetry(
+    String code,
+    String redirectUri,
+    int maxRetries
+) throws Exception {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            return scalekitClient
+                .authentication()
+                .authenticateWithCode(code, redirectUri, new AuthenticationOptions());
+        } catch (Exception e) {
+            if (isNetworkError(e)) {
+                if (attempt == maxRetries) {
+                    throw new Exception("Max retries reached: " + e.getMessage());
+                }
+
+                // Exponential backoff
+                long delay = (long) Math.pow(2, attempt);
+                System.out.printf("Attempt %d failed, retrying in %ds...%n", attempt, delay);
+                TimeUnit.SECONDS.sleep(delay);
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    throw new Exception("Authentication failed after " + maxRetries + " attempts");
+}
+
+private boolean isNetworkError(Exception e) {
+    String message = e.getMessage().toLowerCase();
+    return message.contains("timeout") || message.contains("connection");
+}
+```
+  </TabItem>
+</Tabs>
+
+## Error Logging
+
+Log errors for debugging and monitoring:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+import winston from 'winston';
+
+const logger = winston.createLogger({
+  level: 'error',
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.File({ filename: 'error.log' })
+  ]
+});
+
+try {
+  const authResult = await scalekit.authenticateWithCode(code, redirectUri);
+} catch (error) {
+  logger.error('Authentication failed', {
+    error: error.message,
+    code: error.code,
+    stack: error.stack,
+    timestamp: new Date().toISOString(),
+  });
+  throw error;
+}
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+import logging
+
+logging.basicConfig(
+    filename='error.log',
+    level=logging.ERROR,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+try:
+    auth_result = scalekit_client.authenticate_with_code(
+        code, redirect_uri, options
+    )
+except Exception as error:
+    logging.error('Authentication failed', exc_info=True, extra={
+        'error': str(error),
+        'code': code,
+    })
+    raise
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+import "log"
+
+authResult, err := scalekitClient.AuthenticateWithCode(
+    ctx, code, redirectUri, options,
+)
+
+if err != nil {
+    log.Printf("Authentication failed: %v", err)
+    log.Printf("Code: %s, RedirectURI: %s", code, redirectUri)
+    return err
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+
+try {
+    AuthenticationResponse authResult = scalekitClient
+        .authentication()
+        .authenticateWithCode(code, redirectUri, options);
+} catch (Exception e) {
+    logger.error("Authentication failed", e);
+    logger.error("Code: {}, RedirectURI: {}", code, redirectUri);
+    throw e;
+}
+```
+  </TabItem>
+</Tabs>
+
+## User-Friendly Error Messages
+
+Display helpful error messages to users:
+
+```javascript title="Error mapping"
+const ERROR_MESSAGES = {
+  invalid_grant: 'Your login session has expired. Please try again.',
+  invalid_client: 'Configuration error. Please contact support.',
+  access_denied: 'You denied access to your account.',
+  network_error: 'Network connection failed. Please check your internet.',
+  session_expired: 'Your session has expired. Please sign in again.',
+  invalid_state: 'Security validation failed. Please try again.',
+};
+
+function getUserMessage(errorCode) {
+  return ERROR_MESSAGES[errorCode] || 'An unexpected error occurred. Please try again.';
+}
+
+// Usage
+try {
+  const authResult = await scalekit.authenticateWithCode(code, redirectUri);
+} catch (error) {
+  const userMessage = getUserMessage(error.code);
+  return res.redirect(`/login?error=${encodeURIComponent(userMessage)}`);
+}
+```
+
+## Best Practices
+
+1. **Always validate input** - Check for required parameters before making SDK calls
+2. **Implement retry logic** - Handle transient network errors with exponential backoff
+3. **Log errors properly** - Include context for debugging without exposing sensitive data
+4. **Provide user feedback** - Show clear, actionable error messages to users
+5. **Monitor error rates** - Track error patterns to identify systemic issues
+6. **Handle CSRF attacks** - Always validate state parameter in OAuth callbacks
+7. **Secure error responses** - Never expose internal errors or stack traces to users
+8. **Test error scenarios** - Write tests for common error conditions
+
+## Next Steps
+
+- [Explore code examples](/sdks/examples/)
+- [Review SDK configuration](/sdks/configuration/)
+- [View SDK overview](/sdks/overview/)

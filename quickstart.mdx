@@ -1,80 +1,419 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: "Get started with Scalekit authentication in minutes - implement sign-up, login, and session management"
 ---
 
-## Get started in three steps
+Scalekit provides complete authentication infrastructure for modern applications. This quickstart guides you through implementing user authentication with hosted auth pages, managed sessions, and secure logout.
 
-Get your documentation site running locally and make your first customization.
+## What you'll build
 
-### Step 1: Set up your local environment
+You'll implement:
+- Sign-up and login flows with hosted authentication pages
+- Secure session management with token validation and refresh
+- Logout functionality with session invalidation
+- Foundation for enterprise SSO, workspaces, and user management
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+## Prerequisites
+
+Before you begin:
+- Create a Scalekit account at [app.scalekit.com](https://app.scalekit.com)
+- Get your API credentials from **Dashboard > Developers > Settings > API Credentials**
+- Have a development environment with Node.js, Python, Go, or Java
+
+## Implementation steps
+
+<Steps>
+
+### Install Scalekit SDK
+
+Install the SDK for your technology stack:
+
+<CodeGroup>
+
+```bash Node.js
+npm install @scalekit-sdk/node
+```
+
+```bash Python
+pip install scalekit-sdk-python
+```
+
+```bash Go
+go get github.com/scalekit-inc/scalekit-sdk-go
+```
+
+```bash Java
+mvn dependency:get -Dartifact=com.scalekit:scalekit-sdk-java:1.0.0
+```
+
+</CodeGroup>
+
+Add your Scalekit credentials to your environment variables:
+
+```sh .env
+SCALEKIT_ENVIRONMENT_URL=<your-environment-url>
+SCALEKIT_CLIENT_ID=<your-client-id>
+SCALEKIT_CLIENT_SECRET=<your-client-secret>
+```
+
+### Redirect users to sign up or login
+
+Create an authorization URL to redirect users to Scalekit's hosted authentication page:
+
+<CodeGroup>
+
+```javascript Node.js
+import { Scalekit } from '@scalekit-sdk/node';
+
+const scalekit = new Scalekit(
+  process.env.SCALEKIT_ENVIRONMENT_URL,
+  process.env.SCALEKIT_CLIENT_ID,
+  process.env.SCALEKIT_CLIENT_SECRET
+);
+
+// Must match the allowed callback URL in your dashboard
+const redirectUri = 'http://localhost:3000/auth/callback';
+
+const options = {
+  scopes: ['openid', 'profile', 'email', 'offline_access']
+};
+
+const authorizationUrl = scalekit.getAuthorizationUrl(redirectUri, options);
+res.redirect(authorizationUrl);
+```
+
+```python Python
+from scalekit import ScalekitClient, AuthorizationUrlOptions
+
+scalekit_client = ScalekitClient(
+    os.getenv('SCALEKIT_ENVIRONMENT_URL'),
+    os.getenv('SCALEKIT_CLIENT_ID'),
+    os.getenv('SCALEKIT_CLIENT_SECRET')
+)
+
+redirect_uri = 'http://localhost:3000/auth/callback'
+
+options = AuthorizationUrlOptions(
+    scopes=['openid', 'profile', 'email', 'offline_access']
+)
+
+authorization_url = scalekit_client.get_authorization_url(redirect_uri, options)
+return redirect(authorization_url)
+```
+
+```go Go
+import "github.com/scalekit-inc/scalekit-sdk-go"
+
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+redirectUri := "http://localhost:3000/auth/callback"
+
+options := scalekit.AuthorizationUrlOptions{
+    Scopes: []string{"openid", "profile", "email", "offline_access"},
+}
+
+authorizationUrl, err := scalekitClient.GetAuthorizationUrl(redirectUri, options)
+if err != nil {
+    panic(err)
+}
+
+c.Redirect(http.StatusFound, authorizationUrl.String())
+```
+
+```java Java
+import com.scalekit.ScalekitClient;
+import com.scalekit.internal.http.AuthorizationUrlOptions;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENVIRONMENT_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+String redirectUri = "http://localhost:3000/auth/callback";
+
+AuthorizationUrlOptions options = new AuthorizationUrlOptions();
+options.setScopes(Arrays.asList("openid", "profile", "email", "offline_access"));
+
+URL authorizationUrl = scalekitClient.authentication().getAuthorizationUrl(redirectUri, options);
+```
+
+</CodeGroup>
+
+<Note>
+Register your redirect URLs in **Dashboard > Authentication > Redirect URLs** before implementing the callback.
+</Note>
+
+### Handle the authentication callback
+
+After successful authentication, Scalekit redirects to your callback URL with an authorization code. Exchange this code for user details and session tokens:
+
+<CodeGroup>
+
+```javascript Node.js
+app.get('/auth/callback', async (req, res) => {
+  const { code, error, error_description } = req.query;
+
+  if (error) {
+    return res.status(401).json({ error, error_description });
+  }
+
+  try {
+    const authResult = await scalekit.authenticateWithCode(
+      code,
+      redirectUri
+    );
+
+    const { user, idToken, accessToken, refreshToken } = authResult;
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    // Store tokens securely and create session
+    res.redirect('/dashboard/profile');
+  } catch (err) {
+    console.error('Authentication failed:', err);
+    res.status(500).json({ error: 'Failed to authenticate user' });
+  }
+});
+```
+
+```python Python
+@app.route('/auth/callback')
+def callback():
+    code = request.args.get('code')
+    error = request.args.get('error')
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    if error:
+        return jsonify({'error': error}), 401
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    try:
+        auth_result = scalekit_client.authenticate_with_code(
+            code,
+            redirect_uri
+        )
+        
+        user = auth_result.user
+        # Store tokens securely and create session
+        return redirect('/dashboard/profile')
+    except Exception as err:
+        return jsonify({'error': 'Authentication failed'}), 500
+```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+```go Go
+func callbackHandler(c *gin.Context) {
+    code := c.Query("code")
+    errorParam := c.Query("error")
+    
+    if errorParam != "" {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": errorParam})
+        return
+    }
+    
+    options := scalekit.AuthenticationOptions{}
+    authResult, err := scalekitClient.AuthenticateWithCode(
+        c.Request.Context(), code, redirectUri, options,
+    )
+    
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
+        return
+    }
+    
+    user := authResult.User
+    // Store tokens securely and create session
+    c.Redirect(http.StatusFound, "/dashboard/profile")
+}
+```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+```java Java
+@GetMapping("/auth/callback")
+public Object callback(
+    @RequestParam(required = false) String code,
+    @RequestParam(required = false) String error
+) {
+    if (error != null) {
+        // Handle error
+    }
+    
+    try {
+        AuthenticationOptions options = new AuthenticationOptions();
+        AuthenticationResponse authResult = scalekitClient
+            .authentication()
+            .authenticateWithCode(code, redirectUri, options);
+        
+        var user = authResult.getIdTokenClaims();
+        // Store tokens securely and create session
+        return new RedirectView("/dashboard/profile");
+    } catch (Exception err) {
+        // Handle exception
+    }
+}
+```
 
-### Step 3: Go live
+</CodeGroup>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+### Create and manage user sessions
+
+Store session tokens securely using HttpOnly cookies:
+
+<CodeGroup>
+
+```javascript Node.js
+res.cookie('accessToken', authResult.accessToken, {
+  maxAge: (authResult.expiresIn - 60) * 1000,
+  httpOnly: true,
+  secure: true,
+  sameSite: 'strict'
+});
+
+res.cookie('refreshToken', authResult.refreshToken, {
+  httpOnly: true,
+  secure: true,
+  path: '/auth/refresh',
+  sameSite: 'strict'
+});
+```
+
+```python Python
+response.set_cookie(
+    'accessToken',
+    auth_result.access_token,
+    max_age=auth_result.expires_in - 60,
+    httponly=True,
+    secure=True,
+    samesite='Strict'
+)
+
+response.set_cookie(
+    'refreshToken',
+    auth_result.refresh_token,
+    httponly=True,
+    secure=True,
+    path='/auth/refresh',
+    samesite='Strict'
+)
+```
+
+```go Go
+c.SetSameSite(http.SameSiteStrictMode)
+
+c.SetCookie(
+    "accessToken",
+    authResult.AccessToken,
+    authResult.ExpiresIn-60,
+    "/",
+    "",
+    true,
+    true,
+)
+
+c.SetCookie(
+    "refreshToken",
+    authResult.RefreshToken,
+    0,
+    "/auth/refresh",
+    "",
+    true,
+    true,
+)
+```
+
+```java Java
+Cookie accessTokenCookie = new Cookie("accessToken", authResult.getAccessToken());
+accessTokenCookie.setMaxAge(authResult.getExpiresIn() - 60);
+accessTokenCookie.setHttpOnly(true);
+accessTokenCookie.setSecure(true);
+response.addCookie(accessTokenCookie);
+
+Cookie refreshTokenCookie = new Cookie("refreshToken", authResult.getRefreshToken());
+refreshTokenCookie.setHttpOnly(true);
+refreshTokenCookie.setSecure(true);
+refreshTokenCookie.setPath("/auth/refresh");
+response.addCookie(refreshTokenCookie);
+```
+
+</CodeGroup>
+
+### Log out the user
+
+Clear session data and invalidate the user's session:
+
+<CodeGroup>
+
+```javascript Node.js
+app.get('/logout', (req, res) => {
+  clearSessionData();
+  
+  const logoutUrl = scalekit.getLogoutUrl(
+    idTokenHint,
+    postLogoutRedirectUri
+  );
+  
+  res.redirect(logoutUrl);
+});
+```
+
+```python Python
+@app.route('/logout')
+def logout():
+    clear_session_data()
+    
+    options = LogoutUrlOptions(
+        id_token_hint=id_token,
+        post_logout_redirect_uri=post_logout_redirect_uri
+    )
+    logout_url = scalekit_client.get_logout_url(options)
+    
+    return redirect(logout_url)
+```
+
+```go Go
+func logoutHandler(c *gin.Context) {
+    clearSessionData()
+    
+    options := scalekit.LogoutUrlOptions{
+        IdTokenHint: idToken,
+        PostLogoutRedirectUri: postLogoutRedirectUri,
+    }
+    logoutUrl, _ := scalekitClient.GetLogoutUrl(options)
+    
+    c.Redirect(http.StatusFound, logoutUrl.String())
+}
+```
+
+```java Java
+@GetMapping("/logout")
+public RedirectView logout() {
+    clearSessionData();
+    
+    LogoutUrlOptions options = new LogoutUrlOptions();
+    options.setIdTokenHint(idToken);
+    options.setPostLogoutRedirectUri(postLogoutRedirectUri);
+    
+    URL logoutUrl = scalekitClient.authentication().getLogoutUrl(options);
+    return new RedirectView(logoutUrl.toString());
+}
+```
+
+</CodeGroup>
+
+</Steps>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Core Concepts" icon="book" href="/concepts/authentication-flows">
+    Understand authentication flows and session management
+  </Card>
+  <Card title="Enterprise SSO" icon="building" href="/guides/sso-integration">
+    Add enterprise SSO for your customers
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Explore the complete API documentation
+  </Card>
+  <Card title="SDKs" icon="terminal" href="/sdks/overview">
+    Learn more about SDK features and configuration
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

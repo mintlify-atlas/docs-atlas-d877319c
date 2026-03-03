@@ -1,0 +1,93 @@
+---
+title: Migration guides
+description: Migrate from other authentication providers to Scalekit
+---
+
+Guides for migrating from other authentication providers.
+
+## Migrating from Auth0
+
+Key differences and migration steps:
+
+### User migration
+
+- Export users from Auth0
+- Import users via Scalekit API
+- Migrate SSO connections
+- Update application code
+
+### Code changes
+
+```javascript
+// Auth0
+const auth0 = new Auth0Client({
+  domain: 'example.auth0.com',
+  clientId: 'CLIENT_ID'
+});
+
+// Scalekit
+const scalekit = new Scalekit(
+  process.env.SCALEKIT_ENVIRONMENT_URL,
+  process.env.SCALEKIT_CLIENT_ID,
+  process.env.SCALEKIT_CLIENT_SECRET
+);
+```
+
+## Migrating from Firebase Auth
+
+Steps to migrate from Firebase:
+
+### Export users
+
+1. Use Firebase CLI to export users
+2. Transform to Scalekit format
+3. Import via API
+
+### Update SDK calls
+
+```javascript
+// Firebase
+await firebase.auth().signInWithEmailAndPassword(email, password);
+
+// Scalekit
+const authUrl = scalekit.getAuthorizationUrl(redirectUri);
+res.redirect(authUrl);
+```
+
+## Migrating from AWS Cognito
+
+Cognito to Scalekit migration:
+
+### User pools
+
+- Export user pool data
+- Map attributes to Scalekit schema
+- Import users
+- Configure SSO
+
+### Application changes
+
+Replace Cognito SDK calls with Scalekit SDK.
+
+## Migration checklist
+
+- [ ] Export user data
+- [ ] Map user attributes
+- [ ] Import users to Scalekit
+- [ ] Configure SSO connections
+- [ ] Update application code
+- [ ] Test authentication flows
+- [ ] Update redirect URLs
+- [ ] Deploy to production
+- [ ] Monitor for issues
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get started with Scalekit
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    API documentation
+  </Card>
+</CardGroup>

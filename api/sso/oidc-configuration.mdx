@@ -1,0 +1,68 @@
+---
+title: OIDC configuration
+description: Configure OpenID Connect connections
+---
+
+Configure OpenID Connect (OIDC) SSO connections for modern identity providers.
+
+## OIDC discovery
+
+Use automatic discovery with issuer URL:
+
+```json
+{
+  "issuer": "https://idp.example.com",
+  "clientId": "your-client-id",
+  "clientSecret": "your-client-secret"
+}
+```
+
+## Manual configuration
+
+Configure OIDC endpoints manually:
+
+```json
+{
+  "authorizationEndpoint": "https://idp.example.com/authorize",
+  "tokenEndpoint": "https://idp.example.com/token",
+  "userinfoEndpoint": "https://idp.example.com/userinfo",
+  "jwksUri": "https://idp.example.com/.well-known/jwks.json",
+  "clientId": "your-client-id",
+  "clientSecret": "your-client-secret"
+}
+```
+
+## Scopes
+
+Request OIDC scopes:
+
+```json
+{
+  "scopes": ["openid", "profile", "email"]
+}
+```
+
+## Claims mapping
+
+Map OIDC claims to user profile:
+
+```json
+{
+  "claimsMapping": {
+    "email": "email",
+    "firstName": "given_name",
+    "lastName": "family_name"
+  }
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SSO connections" icon="plug" href="/api/sso/connections">
+    Manage SSO connections
+  </Card>
+  <Card title="SAML configuration" icon="file-lines" href="/api/sso/saml-configuration">
+    Configure SAML
+  </Card>
+</CardGroup>

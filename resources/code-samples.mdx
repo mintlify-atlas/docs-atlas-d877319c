@@ -1,0 +1,123 @@
+---
+title: Code samples
+description: Example implementations and code snippets
+---
+
+Example code to help you implement Scalekit authentication.
+
+## Full applications
+
+### Next.js + Scalekit
+
+Complete Next.js application with:
+- User authentication
+- Session management
+- Protected routes
+- SSO integration
+
+[View on GitHub](https://github.com/scalekit-inc/nextjs-example-apps)
+
+### Express.js + Scalekit
+
+Express backend with:
+- OAuth flows
+- Token management
+- API protection
+- Webhook handling
+
+[View on GitHub](https://github.com/scalekit-inc/nodejs-example-apps)
+
+### Python Flask + Scalekit
+
+Flask application with:
+- Authentication flows
+- Session cookies
+- Middleware
+- Database integration
+
+[View on GitHub](https://github.com/scalekit-inc/python-example-apps)
+
+## Code snippets
+
+### Authentication middleware
+
+```javascript
+async function requireAuth(req, res, next) {
+  const accessToken = req.cookies.accessToken;
+  
+  if (!accessToken) {
+    return res.redirect('/login');
+  }
+  
+  try {
+    const isValid = await scalekit.validateAccessToken(accessToken);
+    if (!isValid) {
+      return res.redirect('/login');
+    }
+    next();
+  } catch (error) {
+    return res.redirect('/login');
+  }
+}
+
+app.get('/dashboard', requireAuth, (req, res) => {
+  res.render('dashboard');
+});
+```
+
+### Token refresh
+
+```javascript
+async function refreshTokenMiddleware(req, res, next) {
+  const { accessToken, refreshToken } = req.cookies;
+  
+  const isValid = await scalekit.validateAccessToken(accessToken);
+  
+  if (!isValid && refreshToken) {
+    const authResult = await scalekit.refreshAccessToken(refreshToken);
+    res.cookie('accessToken', authResult.accessToken);
+    res.cookie('refreshToken', authResult.refreshToken);
+  }
+  
+  next();
+}
+```
+
+### Webhook handler
+
+```javascript
+app.post('/webhooks', async (req, res) => {
+  const signature = req.headers['x-scalekit-signature'];
+  
+  if (!verifySignature(req.body, signature)) {
+    return res.status(401).send('Invalid signature');
+  }
+  
+  const event = req.body;
+  
+  switch (event.type) {
+    case 'user.authenticated':
+      await handleUserAuthenticated(event.data);
+      break;
+    case 'user.created':
+      await handleUserCreated(event.data);
+      break;
+  }
+  
+  res.status(200).send('OK');
+});
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get started
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    API documentation
+  </Card>
+  <Card title="SDKs" icon="terminal" href="/sdks/overview">
+    Official SDKs
+  </Card>
+</CardGroup>

@@ -1,0 +1,115 @@
+---
+title: 'API Overview'
+description: 'Introduction to the Scalekit API, base URLs, and versioning'
+---
+
+## Introduction
+
+The Scalekit API is a RESTful API that enables you to manage organizations, users, and authentication settings. All requests must use HTTPS and include proper authentication credentials.
+
+## Base URLs
+
+Scalekit operates two separate environments with different base URLs:
+
+<CodeGroup>
+```text Development
+https://{your-subdomain}.scalekit.dev
+```
+
+```text Production
+https://{your-subdomain}.scalekit.com
+```
+
+```text Custom Domain
+https://auth.yourapp.com
+```
+</CodeGroup>
+
+<Note>
+Resources cannot be moved between Development and Production environments. Each environment maintains its own isolated data and configurations.
+</Note>
+
+## API Versioning
+
+The Scalekit API uses version 1.0.0. All API endpoints are prefixed with `/api/v1/` to ensure backward compatibility.
+
+Example endpoint structure:
+```
+https://{your-subdomain}.scalekit.dev/api/v1/organizations
+```
+
+## Request Format
+
+All API requests should include the following headers:
+
+<ParamField header="Content-Type" type="string" required>
+  Set to `application/json` for all requests
+</ParamField>
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token obtained from OAuth 2.0 Client Credentials flow
+</ParamField>
+
+<ParamField header="Accept" type="string">
+  Set to `application/json` to receive JSON responses
+</ParamField>
+
+## Response Format
+
+All successful API responses return JSON with appropriate HTTP status codes:
+
+| Status Code | Description |
+|------------|-------------|
+| 200/201 | Success |
+| 400 | Invalid request |
+| 401 | Authentication error |
+| 404 | Resource not found |
+| 429 | Rate limit exceeded |
+| 500/501/504 | Server error |
+
+### Error Response Structure
+
+Error responses include detailed information to help diagnose issues:
+
+```json
+{
+  "code": 16,
+  "message": "Token empty",
+  "details": [
+    {
+      "@type": "type.googleapis.com/scalekit.v1.errdetails.ErrorInfo",
+      "error_code": "UNAUTHENTICATED"
+    }
+  ]
+}
+```
+
+## SDKs
+
+Scalekit provides official SDKs for multiple programming languages:
+
+<CardGroup cols={2}>
+  <Card title="Node.js SDK" icon="node-js" href="https://github.com/scalekit-inc/scalekit-sdk-node">
+    Install via npm: `@scalekit-sdk/node`
+  </Card>
+  <Card title="Python SDK" icon="python" href="https://github.com/scalekit-inc/scalekit-sdk-python">
+    Install via pip: `scalekit-sdk-python`
+  </Card>
+  <Card title="Go SDK" icon="golang" href="https://github.com/scalekit-inc/scalekit-sdk-go">
+    Install via go get: `github.com/scalekit-inc/scalekit-sdk-go`
+  </Card>
+  <Card title="Java SDK" icon="java" href="https://github.com/scalekit-inc/scalekit-sdk-java">
+    Add Maven dependency: `com.scalekit:scalekit-sdk-java`
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Learn how to authenticate API requests
+  </Card>
+  <Card title="Rate Limits" icon="gauge" href="/api/rate-limits">
+    Understand API rate limiting policies
+  </Card>
+</CardGroup>

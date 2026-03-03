@@ -1,0 +1,159 @@
+---
+title: Webhooks overview
+description: Receive real-time notifications for authentication events
+---
+
+Webhooks notify your application of authentication events in real-time.
+
+## What are webhooks
+
+Webhooks are HTTP callbacks that Scalekit sends to your application when events occur:
+
+- User authentication
+- User creation/update
+- Session events
+- SSO configuration changes
+- SCIM provisioning events
+
+## Webhook flow
+
+1. Event occurs in Scalekit (e.g., user logs in)
+2. Scalekit sends HTTP POST to your webhook URL
+3. Your application processes the event
+4. Your application responds with 200 OK
+
+## Configuration
+
+Configure webhooks in **Dashboard > Developers > Webhooks**:
+
+1. Add your webhook URL
+2. Select events to receive
+3. Copy the signing secret
+4. Test the webhook
+
+## Webhook format
+
+```json
+{
+  "id": "evt_1234567890",
+  "type": "user.authenticated",
+  "created": "2024-01-15T10:30:00Z",
+  "data": {
+    "userId": "usr_1234567890",
+    "organizationId": "org_1234567890",
+    "email": "user@example.com"
+  }
+}
+```
+
+## Verifying webhooks
+
+Verify webhook signatures to ensure authenticity:
+
+<CodeGroup>
+
+```javascript Node.js
+const crypto = require('crypto');
+
+function verifyWebhook(payload, signature, secret) {
+  const hmac = crypto.createHmac('sha256', secret);
+  const digest = hmac.update(payload).digest('hex');
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(digest)
+  );
+}
+
+app.post('/webhooks', (req, res) => {
+  const signature = req.headers['x-scalekit-signature'];
+  const payload = JSON.stringify(req.body);
+  
+  if (!verifyWebhook(payload, signature, webhookSecret)) {
+    return res.status(401).send('Invalid signature');
+  }
+  
+  // Process event
+  res.status(200).send('OK');
+});
+```
+
+```python Python
+import hmac
+import hashlib
+
+def verify_webhook(payload, signature, secret):
+    digest = hmac.new(
+        secret.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(signature, digest)
+
+@app.route('/webhooks', methods=['POST'])
+def webhook():
+    signature = request.headers.get('X-Scalekit-Signature')
+    payload = request.get_data(as_text=True)
+    
+    if not verify_webhook(payload, signature, webhook_secret):
+        return 'Invalid signature', 401
+    
+    # Process event
+    return 'OK', 200
+```
+
+</CodeGroup>
+
+## Best practices
+
+### Return 200 quickly
+
+Respond with 200 OK immediately and process asynchronously:
+
+```javascript
+app.post('/webhooks', async (req, res) => {
+  // Verify signature
+  if (!verifySignature(req)) {
+    return res.status(401).send('Invalid signature');
+  }
+  
+  // Queue for processing
+  await queue.add('webhook', req.body);
+  
+  // Return immediately
+  res.status(200).send('OK');
+});
+```
+
+### Handle retries
+
+Scalekit retries failed webhooks with exponential backoff:
+
+- Initial retry: 1 minute
+- Subsequent retries: 2, 4, 8, 16, 30 minutes
+- Maximum retries: 10 attempts
+
+### Idempotency
+
+Process each webhook exactly once:
+
+```javascript
+const processedEvents = new Set();
+
+if (processedEvents.has(event.id)) {
+  return res.status(200).send('Already processed');
+}
+
+processedEvents.add(event.id);
+// Process event
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Webhook events" icon="bell" href="/api/webhooks/events">
+    Available webhook events
+  </Card>
+  <Card title="Webhook security" icon="shield" href="/api/webhooks/security">
+    Security best practices
+  </Card>
+</CardGroup>

@@ -1,0 +1,182 @@
+---
+title: Webhook events
+description: Complete reference of available webhook events
+---
+
+Scalekit sends webhooks for these authentication events.
+
+## Authentication events
+
+### user.authenticated
+
+User successfully authenticated.
+
+```json
+{
+  "type": "user.authenticated",
+  "data": {
+    "userId": "usr_1234567890",
+    "organizationId": "org_1234567890",
+    "email": "user@example.com",
+    "method": "sso"
+  }
+}
+```
+
+### user.authentication_failed
+
+Authentication attempt failed.
+
+```json
+{
+  "type": "user.authentication_failed",
+  "data": {
+    "email": "user@example.com",
+    "reason": "invalid_credentials"
+  }
+}
+```
+
+## User events
+
+### user.created
+
+New user created.
+
+```json
+{
+  "type": "user.created",
+  "data": {
+    "userId": "usr_1234567890",
+    "email": "user@example.com",
+    "organizationId": "org_1234567890"
+  }
+}
+```
+
+### user.updated
+
+User profile updated.
+
+```json
+{
+  "type": "user.updated",
+  "data": {
+    "userId": "usr_1234567890",
+    "changes": ["email", "name"]
+  }
+}
+```
+
+### user.deleted
+
+User deleted.
+
+```json
+{
+  "type": "user.deleted",
+  "data": {
+    "userId": "usr_1234567890"
+  }
+}
+```
+
+## Session events
+
+### session.created
+
+New session started.
+
+```json
+{
+  "type": "session.created",
+  "data": {
+    "sessionId": "ses_1234567890",
+    "userId": "usr_1234567890"
+  }
+}
+```
+
+### session.expired
+
+Session expired.
+
+```json
+{
+  "type": "session.expired",
+  "data": {
+    "sessionId": "ses_1234567890",
+    "userId": "usr_1234567890"
+  }
+}
+```
+
+## SSO events
+
+### connection.created
+
+SSO connection configured.
+
+```json
+{
+  "type": "connection.created",
+  "data": {
+    "connectionId": "conn_1234567890",
+    "organizationId": "org_1234567890",
+    "type": "SAML"
+  }
+}
+```
+
+### connection.enabled
+
+SSO connection activated.
+
+```json
+{
+  "type": "connection.enabled",
+  "data": {
+    "connectionId": "conn_1234567890"
+  }
+}
+```
+
+## SCIM events
+
+### scim.user_provisioned
+
+User provisioned via SCIM.
+
+```json
+{
+  "type": "scim.user_provisioned",
+  "data": {
+    "userId": "usr_1234567890",
+    "organizationId": "org_1234567890"
+  }
+}
+```
+
+### scim.user_deprovisioned
+
+User deprovisioned via SCIM.
+
+```json
+{
+  "type": "scim.user_deprovisioned",
+  "data": {
+    "userId": "usr_1234567890"
+  }
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Webhooks overview" icon="webhook" href="/api/webhooks/overview">
+    Getting started with webhooks
+  </Card>
+  <Card title="Webhook security" icon="shield" href="/api/webhooks/security">
+    Security best practices
+  </Card>
+</CardGroup>

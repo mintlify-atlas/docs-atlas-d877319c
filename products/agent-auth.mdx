@@ -1,0 +1,413 @@
+---
+title: Agent authentication
+description: OAuth authentication for AI agents to securely connect with third-party applications like Gmail, Slack, GitHub, and 60+ business tools
+---
+
+Agent Auth enables your AI applications to securely connect to third-party services on behalf of your users. It handles OAuth flows, token management, and multi-provider authentication for popular business applications, allowing your agents to take actions like reading emails, creating calendar events, or managing tasks.
+
+## What you get
+
+Agent Auth simplifies third-party authentication:
+
+- **Multi-provider OAuth**: Support for 60+ popular business applications
+- **Unified API**: Single interface for all provider integrations
+- **Automatic token management**: Token refresh, storage, and lifecycle handling
+- **Flexible credentials**: Use Scalekit-managed OAuth or bring your own
+- **Secure token vault**: Encrypted storage with automatic refresh
+- **Connected accounts**: Per-user authentication state tracking
+
+## Supported providers
+
+Agent Auth supports OAuth 2.0 for a wide range of business applications:
+
+### Communication
+
+- Gmail (Google Workspace)
+- Outlook (Microsoft 365)
+- Slack
+- Microsoft Teams
+- Zoom
+
+### Productivity
+
+- Google Calendar
+- Google Drive
+- OneDrive
+- Notion
+- Dropbox
+
+### Project management
+
+- Jira
+- Asana
+- Trello
+- Monday.com
+- Linear
+- ClickUp
+
+### Development
+
+- GitHub
+- GitLab
+- Bitbucket
+
+### CRM and sales
+
+- Salesforce
+- HubSpot
+- Intercom
+- Zendesk
+
+And 40+ more. [View all supported connectors](/agent-auth/providers)
+
+## Key features
+
+### Quick OAuth integration
+
+Connect users to third-party apps in minutes:
+
+```python
+# Create connected account for user
+response = scalekit_client.actions.get_or_create_connected_account(
+    connection_name="gmail",
+    identifier="user_123"
+)
+
+connected_account = response.connected_account
+```
+
+### Automatic authorization
+
+Generate OAuth links and handle the complete flow:
+
+```python
+# Generate authorization link
+if connected_account.status != "ACTIVE":
+    link_response = scalekit_client.actions.get_authorization_link(
+        connection_name="gmail",
+        identifier="user_123"
+    )
+    
+    # Redirect user to authorize Gmail access
+    print(f"Authorize at: {link_response.link}")
+```
+
+### Token management
+
+Retrieve always-fresh OAuth tokens:
+
+```python
+# Get connected account with valid tokens
+response = scalekit_client.actions.get_connected_account(
+    connection_name="gmail",
+    identifier="user_123"
+)
+
+# Scalekit automatically refreshes expired tokens
+tokens = response.connected_account.authorization_details["oauth_token"]
+access_token = tokens["access_token"]
+refresh_token = tokens["refresh_token"]
+```
+
+### Direct API calls
+
+Use tokens to call provider APIs:
+
+```python
+# Fetch unread emails using Gmail API
+headers = {"Authorization": f"Bearer {access_token}"}
+
+response = requests.get(
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+    headers=headers,
+    params={"q": "is:unread", "maxResults": 5}
+)
+
+messages = response.json().get("messages", [])
+```
+
+## Use cases
+
+### AI agent integrations
+
+Enable agents to take action on behalf of users:
+
+- **Email agent**: Read, send, and manage emails through Gmail or Outlook
+- **Calendar agent**: Schedule meetings and manage calendar events
+- **Task agent**: Create and update tasks in project management tools
+- **Document agent**: Access and modify files in Google Drive or OneDrive
+- **Communication agent**: Send messages through Slack or Teams
+
+### Multi-app workflows
+
+Orchestrate actions across multiple services:
+
+```python
+# Agent that creates task and sends notification
+
+# 1. Create Jira ticket
+jira_response = scalekit_client.tools.execute(
+    connection_name="jira",
+    identifier="user_123",
+    tool_name="create_issue",
+    parameters={"summary": "New feature request"}
+)
+
+# 2. Send Slack notification
+slack_response = scalekit_client.tools.execute(
+    connection_name="slack",
+    identifier="user_123",
+    tool_name="send_message",
+    parameters={"channel": "#engineering", "text": "New Jira ticket created"}
+)
+```
+
+### Coding assistants
+
+Integrate with developer tools:
+
+- Access GitHub repositories
+- Create and manage pull requests
+- Review and comment on code
+- Manage project boards
+- Automate CI/CD workflows
+
+### Business automation
+
+Automate repetitive business tasks:
+
+- Sync CRM data across systems
+- Generate reports from multiple sources
+- Automate customer communication
+- Manage sales pipelines
+- Update project status across tools
+
+## Authentication options
+
+### Scalekit-managed OAuth
+
+Use pre-configured OAuth credentials for instant setup:
+
+**Benefits:**
+
+- Get started immediately without OAuth app registration
+- Pre-configured for all supported providers
+- Perfect for development and testing
+- Shared OAuth credentials across customers
+
+**Best for:**
+
+- Proof of concepts
+- Development environments
+- Quick prototypes
+- Testing integrations
+
+### Bring Your Own OAuth (BYOO)
+
+Use your own OAuth applications:
+
+**Benefits:**
+
+- Custom branding during OAuth consent
+- Higher API rate limits
+- Direct provider relationships
+- Enhanced user trust
+- Full control over scopes
+
+**Best for:**
+
+- Production applications
+- Enterprise customers
+- Custom branding requirements
+- High-volume API usage
+
+## How it works
+
+### 1. Configure connections
+
+Set up OAuth credentials for providers in the Scalekit dashboard:
+
+- Navigate to **Agent Auth > Connections**
+- Create connection for each provider (Gmail, Slack, etc.)
+- Choose Scalekit-managed or bring your own OAuth credentials
+- Configure scopes and permissions
+
+### 2. Create connected accounts
+
+Create connected accounts for each user-provider combination:
+
+```javascript
+// Create connected account for user's Gmail
+const response = await scalekit.connectedAccounts.getOrCreateConnectedAccount({
+  connector: 'gmail',
+  identifier: 'user_123'
+});
+
+const connectedAccount = response.connectedAccount;
+```
+
+### 3. Authorize access
+
+Generate authorization links for users to grant access:
+
+```javascript
+// Generate OAuth authorization link
+if (connectedAccount.status !== 'ACTIVE') {
+  const linkResponse = await scalekit.connectedAccounts.getMagicLinkForConnectedAccount({
+    connector: 'gmail',
+    identifier: 'user_123'
+  });
+  
+  // Redirect user to authorize
+  res.redirect(linkResponse.link);
+}
+```
+
+### 4. Use tokens
+
+Retrieve tokens and call provider APIs:
+
+```javascript
+// Get connected account with tokens
+const accountResponse = await scalekit.connectedAccounts.getConnectedAccountByIdentifier({
+  connector: 'gmail',
+  identifier: 'user_123'
+});
+
+const authDetails = accountResponse.connectedAccount.authorizationDetails;
+const accessToken = authDetails.details.value.accessToken;
+
+// Use token to call Gmail API
+const emails = await fetchEmails(accessToken);
+```
+
+## Multi-provider support
+
+Enable users to connect multiple services:
+
+```javascript
+// Connect both Gmail and Slack for same user
+const gmailAccount = await scalekit.connectedAccounts.create({
+  connector: 'gmail',
+  identifier: 'user_123'
+});
+
+const slackAccount = await scalekit.connectedAccounts.create({
+  connector: 'slack',
+  identifier: 'user_123'
+});
+```
+
+## Token lifecycle
+
+Automatic token management:
+
+- **Automatic refresh**: Tokens refreshed before expiration
+- **Secure storage**: Encrypted token vault
+- **Status tracking**: Monitor connection health
+- **Error handling**: Graceful token expiration handling
+
+```javascript
+// Check connection status
+const account = await scalekit.connectedAccounts.get(accountId);
+
+if (account.status === 'ACTIVE') {
+  // Connection is healthy, tokens are valid
+} else if (account.status === 'EXPIRED') {
+  // Re-authorization required
+  const reAuthUrl = await scalekit.connectedAccounts.getAuthUrl(accountId);
+}
+```
+
+## Framework integrations
+
+Agent Auth integrates with popular AI frameworks:
+
+- **OpenAI**: Use with function calling and assistants
+- **Anthropic**: Integrate with Claude and tool use
+- **LangChain**: Connect agents to external tools
+- **Vercel AI SDK**: Add tool calling to AI apps
+- **Google Generative AI**: Enable function calling
+- **Mastra**: Build multi-agent systems
+
+## Security features
+
+### Encrypted token storage
+
+All tokens stored with enterprise-grade encryption:
+
+- AES-256 encryption at rest
+- TLS 1.3 for data in transit
+- Vault-backed storage with strong isolation
+- Automatic key rotation
+
+### OAuth 2.0 compliance
+
+Standard-compliant OAuth implementation:
+
+- PKCE for authorization code flow
+- State parameter for CSRF protection
+- Secure redirect URI validation
+- Token refresh best practices
+
+### Audit logging
+
+Complete audit trail:
+
+- OAuth authorization events
+- Token refresh operations
+- API call tracking
+- Connection status changes
+
+## Benefits
+
+### Developer experience
+
+- **Unified API**: Single interface for 60+ providers
+- **Automatic refresh**: No manual token management
+- **Pre-built OAuth**: Skip complex implementation
+- **Multi-language SDKs**: Node.js, Python, Go, Java
+- **Standardized errors**: Consistent error handling
+
+### User experience
+
+- **Seamless OAuth**: Smooth authorization flows
+- **Persistent connections**: Long-lived authenticated sessions
+- **Multi-provider**: Connect multiple accounts
+- **Secure**: Enterprise-grade security
+
+### Production ready
+
+- **SOC 2 certified**: Enterprise security standards
+- **99.99% uptime**: High availability
+- **Auto-scaling**: Handles any volume
+- **Global**: Low latency worldwide
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Quickstart guide" icon="rocket" href="/agent-auth/quickstart">
+    Connect to Gmail in 5 minutes
+  </Card>
+  
+  <Card title="Supported providers" icon="plug" href="/agent-auth/providers">
+    View all 60+ supported integrations
+  </Card>
+  
+  <Card title="Framework guides" icon="code" href="/agent-auth/frameworks/overview">
+    Integrate with OpenAI, LangChain, and more
+  </Card>
+  
+  <Card title="Code samples" icon="github" href="/agent-auth/code-samples">
+    Browse complete integration examples
+  </Card>
+</CardGroup>
+
+## Related products
+
+- **[MCP Auth](/products/mcp-auth)**: Authenticate Model Context Protocol servers
+- **[Full-stack Auth](/products/full-stack-auth)**: Complete authentication platform
+
+<Info>
+  Gmail connector is enabled by default for quick getting started. Configure additional providers in **Dashboard > Agent Auth > Connections**.
+</Info>

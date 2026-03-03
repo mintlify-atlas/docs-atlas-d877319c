@@ -1,0 +1,86 @@
+---
+title: 'Delete organization'
+description: 'Permanently remove an organization from your environment'
+---
+
+## DELETE /api/v1/organizations/{id}
+
+Removes an existing organization from the environment using its unique identifier. This operation is permanent and cannot be undone.
+
+## Request
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Unique scalekit-generated identifier that uniquely references an organization.
+  
+  ```
+  org_59615193906282635
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="200" type="success">
+  Organization successfully deleted and no longer accessible. No content returned.
+</ResponseField>
+
+## Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+await scalekit.organization.deleteOrganization(organizationId);
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+from scalekit import ScalekitClient
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENV_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+scalekit_client.organization.delete_organization(organization_id)
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENV_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+err := scalekitClient.Organization.DeleteOrganization(
+    ctx,
+    organizationId,
+)
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENV_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+scalekitClient.organizations().deleteById(organizationId);
+```
+  </TabItem>
+
+  <TabItem label="cURL">
+```bash
+curl -X DELETE 'https://<SCALEKIT_ENV_URL>/api/v1/organizations/{organization_id}' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>'
+```
+  </TabItem>
+</Tabs>

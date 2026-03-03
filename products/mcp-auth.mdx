@@ -1,0 +1,442 @@
+---
+title: MCP server authentication
+description: OAuth 2.1 authorization for Model Context Protocol servers with Dynamic Client Registration and Client ID Metadata Document support
+---
+
+MCP Auth provides drop-in OAuth 2.1 authorization for Model Context Protocol (MCP) servers, enabling secure authentication for AI hosts like Claude Desktop, Cursor, and VS Code. Scalekit acts as your authorization server, handling client registration, token issuance, and scope-based permissions while you focus on building MCP tools.
+
+## What you get
+
+MCP Auth implements the complete OAuth 2.1 authorization server:
+
+- **OAuth 2.1 authorization server**: Production-ready OAuth for MCP servers
+- **Dynamic Client Registration (DCR)**: Automatic client onboarding without manual setup
+- **Client ID Metadata Document (CIMD)**: Simplified client registration via metadata
+- **Token management**: Access token issuance, validation, and refresh
+- **Scope-based permissions**: Granular control over tool access
+- **Multiple auth methods**: Enterprise SSO, social logins, and custom auth
+
+## Why MCP needs authentication
+
+MCP servers expose tools that AI hosts can discover and execute. Without authentication:
+
+- Any client could access your MCP server resources
+- No way to identify which user is making requests
+- Cannot implement per-user permissions or rate limits
+- Difficult to audit and track tool usage
+
+With MCP Auth:
+
+- Only authorized clients can access your server
+- Every request identifies the authenticated user
+- Implement fine-grained, scope-based permissions
+- Complete audit trail of all tool executions
+
+## Key features
+
+### Drop-in OAuth 2.1 server
+
+Scalekit acts as your authorization server:
+
+```javascript
+// Your MCP server just validates tokens
+const authHeader = req.headers['authorization'];
+const token = authHeader?.split('Bearer ')[1];
+
+await scalekit.validateToken(token, {
+  audience: [RESOURCE_ID]
+});
+```
+
+Scalekit handles:
+
+- Authorization endpoint (`/oauth/authorize`)
+- Token endpoint (`/oauth/token`)
+- Client registration endpoint (`/client_register`)
+- JWKS endpoint for token verification
+- Metadata endpoints for discovery
+
+### Dynamic Client Registration (DCR)
+
+Automatic client onboarding:
+
+- MCP clients register themselves without manual setup
+- No pre-configuration required
+- Instant onboarding for new AI hosts
+- Automatic client credential issuance
+
+```javascript
+// MCP clients automatically register
+// POST /resources/{resource_id}/client_register
+{
+  "client_name": "Claude Desktop",
+  "redirect_uris": ["http://localhost:3000/callback"]
+}
+
+// Response includes client_id and client_secret
+{
+  "client_id": "mcp_client_123",
+  "client_secret": "secret_abc"
+}
+```
+
+### Client ID Metadata Document (CIMD)
+
+Simplified client registration via metadata:
+
+- Clients publish metadata at well-known URL
+- Authorization server fetches metadata automatically
+- No explicit registration request needed
+- Decentralized client configuration
+
+CIMD-enabled clients skip manual registration:
+
+```javascript
+// Client publishes metadata at:
+// https://client-app.com/.well-known/client-configuration
+{
+  "client_id": "https://client-app.com",
+  "client_name": "My MCP Client",
+  "redirect_uris": ["http://localhost:3000/callback"]
+}
+
+// Scalekit fetches and validates automatically
+```
+
+### Resource metadata endpoint
+
+MCP clients discover your OAuth server:
+
+```javascript
+// Implement discovery endpoint on your MCP server
+app.get('/.well-known/oauth-protected-resource', (req, res) => {
+  res.json({
+    "authorization_servers": [
+      "https://<SCALEKIT_ENVIRONMENT_URL>/resources/<RESOURCE_ID>"
+    ],
+    "bearer_methods_supported": ["header"],
+    "resource": "https://mcp.yourapp.com",
+    "scopes_supported": ["todo:read", "todo:write"]
+  });
+});
+```
+
+### Scope-based permissions
+
+Granular access control:
+
+```javascript
+// Validate specific scopes for tool execution
+await scalekit.validateToken(token, {
+  audience: [RESOURCE_ID],
+  requiredScopes: ['todo:write']
+});
+```
+
+Define scopes in Scalekit dashboard:
+
+- `todo:read` - Read access to tasks
+- `todo:write` - Create and modify tasks
+- `todo:delete` - Delete tasks
+- Custom scopes for your tools
+
+## How it works
+
+### Discovery phase
+
+1. **MCP client** encounters your protected MCP server
+2. **Server** responds with `401 Unauthorized` and resource metadata URL
+3. **Client** fetches resource metadata to discover Scalekit authorization server
+4. **Client** fetches authorization server metadata
+
+```http
+GET /.well-known/oauth-protected-resource HTTP/1.1
+Host: mcp.yourapp.com
+
+HTTP/1.1 200 OK
+{
+  "authorization_servers": [
+    "https://your-env.scalekit.com/resources/res_123"
+  ]
+}
+```
+
+### Authorization phase (DCR)
+
+5. **Client** registers with Scalekit via DCR endpoint
+6. **Scalekit** issues client credentials
+7. **Client** initiates authorization code flow
+8. **User** authenticates and grants consent
+9. **Scalekit** issues access token with scopes
+
+### Authorization phase (CIMD)
+
+5. **Client** initiates authorization with PKCE challenge
+6. **Scalekit** fetches client metadata from CIMD URL
+7. **User** authenticates and grants consent
+8. **Scalekit** issues access token with scopes
+
+### Access phase
+
+10. **Client** includes access token in MCP requests
+11. **MCP server** validates token and enforces scopes
+12. **Server** processes request and returns response
+
+## Integration steps
+
+### 1. Register MCP server
+
+In Scalekit dashboard:
+
+1. Navigate to **MCP Servers > Add MCP server**
+2. Provide server name (shown on consent page)
+3. Enable **Dynamic Client Registration** for automatic client onboarding
+4. Enable **CIMD** for metadata-based registration
+5. Configure **Server URL** (your MCP server identifier)
+6. Set **Access token lifetime** (recommended 5-60 minutes)
+7. Define **Scopes** (e.g., `todo:read`, `todo:write`)
+
+### 2. Implement discovery endpoint
+
+```python
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
+app = FastAPI()
+
+@app.get("/.well-known/oauth-protected-resource")
+async def get_oauth_protected_resource():
+    return JSONResponse({
+        "authorization_servers": [
+            "https://<SCALEKIT_ENV>/resources/<RESOURCE_ID>"
+        ],
+        "bearer_methods_supported": ["header"],
+        "resource": "https://mcp.yourapp.com",
+        "scopes_supported": ["todo:read", "todo:write"]
+    })
+```
+
+### 3. Validate tokens
+
+```python
+from scalekit import ScalekitClient
+from scalekit.common.scalekit import TokenValidationOptions
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENVIRONMENT_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET")
+)
+
+RESOURCE_ID = "https://mcp.yourapp.com"
+
+async def auth_middleware(request: Request, call_next):
+    # Skip authentication for discovery endpoints
+    if request.url.path.startswith("/.well-known"):
+        return await call_next(request)
+    
+    # Extract Bearer token
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else None
+    
+    if not token:
+        raise HTTPException(status_code=401)
+    
+    # Validate token
+    try:
+        options = TokenValidationOptions(
+            audience=[RESOURCE_ID]
+        )
+        scalekit_client.validate_token(token, options=options)
+    except Exception:
+        raise HTTPException(status_code=401)
+    
+    return await call_next(request)
+
+app.middleware("http")(auth_middleware)
+```
+
+### 4. Implement scope validation
+
+```python
+# Validate specific scopes for tool execution
+def require_scope(scope: str):
+    try:
+        options = TokenValidationOptions(
+            audience=[RESOURCE_ID],
+            required_scopes=[scope]
+        )
+        scalekit_client.validate_token(token, options=options)
+    except Exception:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "insufficient_scope",
+                "error_description": f"Required scope: {scope}"
+            }
+        )
+```
+
+## Authentication methods
+
+### Enterprise SSO
+
+Organizations authenticate through their identity providers:
+
+- Okta, Azure AD, Google Workspace
+- SAML and OIDC protocols
+- Centralized access control
+- Single sign-on experience
+
+**Note**: Requires organization domain registration through admin portal.
+
+### Social logins
+
+Individual users authenticate via social providers:
+
+- Google, GitHub, Microsoft
+- Quick onboarding
+- Familiar authentication
+- Personal and small team use
+
+### Custom authentication
+
+Integrate your own authentication system:
+
+- Use existing user database
+- Custom authentication logic
+- Bring your own identity provider
+- Full control over authentication
+
+## Use cases
+
+### Customer-facing MCP servers
+
+Secure MCP servers for external customers:
+
+- **SaaS MCP servers**: Authenticate customers before tool access
+- **API-backed tools**: Protect sensitive data and operations
+- **Multi-tenant servers**: Per-customer access control
+
+### Internal enterprise tools
+
+Secure internal MCP servers:
+
+- **Development tools**: GitHub, Jira, internal APIs
+- **Business tools**: CRM, project management, databases
+- **Compliance**: Audit trail for all tool executions
+
+### AI agent integrations
+
+Authenticate autonomous agents:
+
+- **Coding assistants**: Access to code repositories and tools
+- **Business agents**: CRM updates, task creation
+- **Data agents**: Database queries, analytics
+
+## Security features
+
+### OAuth 2.1 enhancements
+
+- **Mandatory PKCE**: Prevents authorization code interception
+- **Strict redirect validation**: Exact URI matching required
+- **Short-lived tokens**: Configurable 5-60 minute lifetime
+- **Token binding**: Prevents token theft and replay attacks
+
+### Audit and compliance
+
+- Complete authentication event logs
+- Token issuance and validation tracking
+- Scope-based access logs
+- Per-user activity monitoring
+
+### Token security
+
+- JWT-based access tokens
+- RS256 signature algorithm
+- JWKS endpoint for verification
+- Automatic token expiration
+
+## FastMCP integration
+
+Using FastMCP? Add auth in 5 lines:
+
+```python
+from fastmcp import FastMCP
+from fastmcp_scalekit import ScalekitAuthProvider
+
+mcp = FastMCP("My MCP Server")
+
+# Add Scalekit auth provider
+mcp.add_auth_provider(
+    ScalekitAuthProvider(
+        resource_id="res_123",
+        scalekit_env_url="https://your-env.scalekit.com"
+    )
+)
+```
+
+[FastMCP quickstart guide](/authenticate/mcp/fastmcp-quickstart)
+
+## Framework support
+
+MCP Auth works with popular MCP frameworks:
+
+- **FastMCP** (Python): First-class Scalekit plugin
+- **Express.js** (Node.js): Middleware-based integration
+- **FastAPI** (Python): Middleware and dependency injection
+- **Custom servers**: Any HTTP framework with middleware support
+
+## Benefits
+
+### Developer experience
+
+- **Drop-in solution**: OAuth server ready in minutes
+- **No OAuth expertise**: Scalekit handles complex OAuth flows
+- **Automatic client registration**: DCR and CIMD support
+- **Simple token validation**: Single SDK method
+- **Multi-language SDKs**: Node.js, Python, Go, Java
+
+### Security and compliance
+
+- **OAuth 2.1 standard**: Industry-standard authorization
+- **SOC 2 certified**: Enterprise-grade security
+- **Audit logging**: Complete access trail
+- **Scope enforcement**: Fine-grained permissions
+- **99.99% uptime**: Production-ready reliability
+
+### Compatibility
+
+- **MCP compliant**: Follows MCP authorization specification
+- **AI host compatible**: Works with Claude, Cursor, VS Code
+- **Standards-based**: OAuth 2.1, DCR, CIMD, PKCE
+- **Future-proof**: Supports evolving MCP standards
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Quickstart guide" icon="rocket" href="/authenticate/mcp/quickstart">
+    Add OAuth to your MCP server in 30 minutes
+  </Card>
+  
+  <Card title="FastMCP quickstart" icon="zap" href="/authenticate/mcp/fastmcp-quickstart">
+    Add auth to FastMCP in 5 lines of code
+  </Card>
+  
+  <Card title="Learn MCP auth" icon="book" href="/authenticate/mcp/intro-to-mcp-auth">
+    Understand OAuth 2.1 for MCP servers
+  </Card>
+  
+  <Card title="Code samples" icon="code" href="/dev-kit/code-samples/mcp-auth">
+    Browse complete integration examples
+  </Card>
+</CardGroup>
+
+## Related products
+
+- **[Agent Auth](/products/agent-auth)**: OAuth for AI agents to third-party apps
+- **[Full-stack Auth](/products/full-stack-auth)**: Complete authentication platform
+
+<Note>
+  For FastMCP users: Use the Scalekit plugin to add authentication in just 5 lines of code. [See the FastMCP quickstart](/authenticate/mcp/fastmcp-quickstart).
+</Note>

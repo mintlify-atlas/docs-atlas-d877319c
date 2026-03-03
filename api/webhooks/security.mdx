@@ -1,0 +1,153 @@
+---
+title: Webhook security
+description: Best practices for secure webhook handling
+---
+
+Implement webhooks securely to protect your application.
+
+## Signature verification
+
+Always verify webhook signatures:
+
+```javascript
+const crypto = require('crypto');
+
+function verifySignature(payload, signature, secret) {
+  const hmac = crypto.createHmac('sha256', secret);
+  const digest = 'sha256=' + hmac.update(payload).digest('hex');
+  
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(digest)
+  );
+}
+
+app.post('/webhooks', (req, res) => {
+  const signature = req.headers['x-scalekit-signature'];
+  const payload = JSON.stringify(req.body);
+  
+  if (!verifySignature(payload, signature, process.env.WEBHOOK_SECRET)) {
+    return res.status(401).send('Unauthorized');
+  }
+  
+  // Process webhook
+});
+```
+
+## HTTPS only
+
+Webhook URLs must use HTTPS:
+
+- Prevents man-in-the-middle attacks
+- Protects webhook data in transit
+- Required for production use
+
+## IP allowlisting
+
+Restrict webhook access to Scalekit IP addresses:
+
+```javascript
+const SCALEKIT_IPS = [
+  '52.206.68.0/24',
+  '54.236.0.0/16'
+];
+
+function isScalekitIP(ip) {
+  // Check if IP matches allowed ranges
+  return SCALEKIT_IPS.some(range => ipInRange(ip, range));
+}
+
+app.post('/webhooks', (req, res) => {
+  if (!isScalekitIP(req.ip)) {
+    return res.status(403).send('Forbidden');
+  }
+  // Process webhook
+});
+```
+
+## Replay protection
+
+Prevent replay attacks by tracking processed events:
+
+```javascript
+const processedEvents = new Map();
+const MAX_AGE = 5 * 60 * 1000; // 5 minutes
+
+app.post('/webhooks', (req, res) => {
+  const eventId = req.body.id;
+  const eventTime = new Date(req.body.created).getTime();
+  
+  // Check if event is too old
+  if (Date.now() - eventTime > MAX_AGE) {
+    return res.status(400).send('Event too old');
+  }
+  
+  // Check if already processed
+  if (processedEvents.has(eventId)) {
+    return res.status(200).send('Already processed');
+  }
+  
+  processedEvents.set(eventId, true);
+  // Process event
+});
+```
+
+## Rate limiting
+
+Protect against webhook floods:
+
+```javascript
+const rateLimit = require('express-rate-limit');
+
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  message: 'Too many webhook requests'
+});
+
+app.post('/webhooks', webhookLimiter, webhookHandler);
+```
+
+## Error handling
+
+Handle errors gracefully:
+
+```javascript
+app.post('/webhooks', async (req, res) => {
+  try {
+    await processWebhook(req.body);
+    res.status(200).send('OK');
+  } catch (error) {
+    logger.error('Webhook processing failed', { error, event: req.body });
+    // Return 500 to trigger retry
+    res.status(500).send('Processing failed');
+  }
+});
+```
+
+## Logging
+
+Log webhook events for auditing:
+
+```javascript
+app.post('/webhooks', (req, res) => {
+  logger.info('Webhook received', {
+    eventType: req.body.type,
+    eventId: req.body.id,
+    timestamp: req.body.created
+  });
+  
+  // Process webhook
+});
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Webhooks overview" icon="webhook" href="/api/webhooks/overview">
+    Getting started with webhooks
+  </Card>
+  <Card title="Webhook events" icon="bell" href="/api/webhooks/events">
+    Available events
+  </Card>
+</CardGroup>

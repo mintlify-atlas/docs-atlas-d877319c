@@ -1,0 +1,570 @@
+---
+title: Modular SCIM provisioning
+description: Automated user provisioning with SCIM 2.0 protocol support, webhooks, and directory sync APIs
+---
+
+Modular SCIM automates user provisioning by syncing users, groups, and roles from enterprise directory providers like Okta, Azure AD, and Google Workspace. Scalekit abstracts SCIM protocol complexity, providing webhooks for real-time updates and REST APIs for on-demand synchronization.
+
+## What you get
+
+Modular SCIM provides directory sync capabilities:
+
+- **SCIM 2.0 protocol**: Compatible with all major directory providers
+- **Real-time webhooks**: Instant notifications for user and group changes
+- **Directory REST APIs**: On-demand user and group retrieval
+- **Self-service admin portal**: Customers configure their own directory sync
+- **Normalized data**: Consistent user/group format across providers
+- **Group-based RBAC**: Map directory groups to application roles
+
+## Why use SCIM provisioning
+
+Automate user lifecycle management:
+
+**Without SCIM:**
+
+- IT manually creates accounts for new employees
+- User data becomes stale and outdated
+- Departing employees retain access
+- Manual role updates prone to errors
+- Time-consuming user management
+
+**With SCIM:**
+
+- New hires automatically provisioned on day one
+- User profiles stay synchronized with HR systems
+- Immediate access revocation when employees leave
+- Role changes propagate automatically
+- Zero manual user management overhead
+
+## Key features
+
+### Real-time webhooks
+
+Receive instant notifications for directory changes:
+
+```javascript
+// Webhook endpoint receives directory events
+app.post('/webhook', async (req, res) => {
+  const event = req.body;
+  const headers = req.headers;
+  const secret = process.env.SCALEKIT_WEBHOOK_SECRET;
+  
+  // Verify webhook signature
+  await scalekit.verifyWebhookPayload(secret, headers, event);
+  
+  // Process event based on type
+  switch (event.type) {
+    case 'organization.directory.user_created':
+      await createUserAccount(event.data.email, event.data.name);
+      break;
+    case 'organization.directory.user_updated':
+      await updateUserAccount(event.data.email, event.data.name);
+      break;
+    case 'organization.directory.user_deleted':
+      await deactivateUserAccount(event.data.email);
+      break;
+    case 'organization.directory.group_created':
+      await createGroup(event.data);
+      break;
+  }
+  
+  res.status(201).json({ message: 'Processed' });
+});
+```
+
+Webhook events include:
+
+- `user_created` - New user provisioned
+- `user_updated` - User profile changed
+- `user_deleted` - User deactivated
+- `group_created` - New group created
+- `group_updated` - Group modified
+- `group_deleted` - Group removed
+
+### Directory REST APIs
+
+Fetch users and groups on-demand:
+
+```javascript
+// List all users in directory
+const { users } = await scalekit.directory.listDirectoryUsers(
+  organizationId,
+  directoryId
+);
+
+users.forEach(user => {
+  console.log(`Email: ${user.email}`);
+  console.log(`Name: ${user.name}`);
+  console.log(`Status: ${user.active}`);
+});
+
+// List all groups
+const { groups } = await scalekit.directory.listDirectoryGroups(
+  organizationId,
+  directoryId
+);
+
+groups.forEach(group => {
+  console.log(`Group: ${group.name}`);
+  console.log(`Members: ${group.member_count}`);
+});
+```
+
+Use cases:
+
+- **Initial sync**: Bulk import existing users
+- **Periodic reconciliation**: Verify data consistency
+- **Manual refresh**: User-triggered synchronization
+- **Audit**: Compare directory state with application state
+
+### Self-service admin portal
+
+Customers configure directory sync:
+
+```javascript
+// Generate admin portal link
+const portalLink = await scalekit.organization.generatePortalLink(orgId);
+
+// Share with customer IT admin
+sendEmail(customerAdmin, {
+  subject: 'Configure Directory Sync',
+  portalUrl: portalLink.location
+});
+```
+
+Admin portal features:
+
+- Configure SCIM connection (automatic metadata)
+- Test directory synchronization
+- View sync status and errors
+- Map custom attributes
+- Download SCIM credentials
+
+### Normalized directory data
+
+Consistent data format across providers:
+
+```javascript
+// Same structure whether Azure AD, Okta, or Google
+const user = {
+  email: 'user@company.com',
+  name: 'John Doe',
+  given_name: 'John',
+  family_name: 'Doe',
+  active: true,
+  external_id: 'user_123',  // IdP's user identifier
+  groups: ['Engineering', 'Admins']
+};
+```
+
+Scalekit normalizes:
+
+- User profile attributes
+- Group memberships
+- Active/inactive status
+- Custom attribute mappings
+
+### Group-based role assignment
+
+Map directory groups to application roles:
+
+```javascript
+// Map directory groups to app roles
+const roleMapping = {
+  'Engineering': 'developer',
+  'Sales': 'sales_rep',
+  'Admins': 'admin'
+};
+
+// Process user creation with groups
+async function createUserAccount(email, name, groups) {
+  // Determine user roles from groups
+  const roles = groups
+    .map(group => roleMapping[group])
+    .filter(role => role);
+  
+  await db.users.create({
+    email,
+    name,
+    roles  // ['developer', 'admin']
+  });
+}
+```
+
+[Group-based RBAC guide](/directory/guides/group-based-role-assignment/)
+
+## How it works
+
+### SCIM provisioning flow
+
+1. **Customer configures**: IT admin sets up directory sync via admin portal
+2. **Initial sync**: Directory provider sends all users and groups
+3. **Real-time updates**: Changes trigger webhooks to your application
+4. **Your app processes**: Create, update, or deactivate users
+5. **Continuous sync**: Directory and application stay synchronized
+
+### Webhook-based provisioning
+
+Real-time user lifecycle automation:
+
+```python
+from fastapi import FastAPI, Request
+import scalekit
+
+app = FastAPI()
+
+@app.post("/webhook")
+async def webhook(request: Request):
+    headers = request.headers
+    body = await request.json()
+    
+    # Verify webhook signature
+    scalekit_client.verify_webhook_payload(
+        secret=os.getenv("SCALEKIT_WEBHOOK_SECRET"),
+        headers=headers,
+        payload=json.dumps(body).encode('utf-8')
+    )
+    
+    event_type = body.get("type")
+    event_data = body.get("data", {})
+    
+    if event_type == "organization.directory.user_created":
+        # New employee onboarding
+        await create_user_account(
+            email=event_data.get("email"),
+            name=event_data.get("name"),
+            groups=event_data.get("groups", [])
+        )
+    elif event_type == "organization.directory.user_deleted":
+        # Employee offboarding
+        await deactivate_user_account(
+            email=event_data.get("email")
+        )
+    
+    return {"status": "processed"}
+```
+
+### API-based provisioning
+
+Scheduled or on-demand synchronization:
+
+```python
+# Scheduled job to sync users
+async def sync_directory_users(organization_id, directory_id):
+    # Fetch all users from directory
+    directory_users = scalekit_client.directory.list_directory_users(
+        organization_id=organization_id,
+        directory_id=directory_id
+    )
+    
+    # Sync to application database
+    for user in directory_users:
+        await upsert_user(
+            email=user.email,
+            name=user.name,
+            active=user.active,
+            groups=user.groups
+        )
+    
+    # Fetch all groups
+    directory_groups = scalekit_client.directory.list_directory_groups(
+        organization_id=organization_id,
+        directory_id=directory_id
+    )
+    
+    # Update group memberships
+    for group in directory_groups:
+        await update_group_members(group)
+```
+
+## Supported directory providers
+
+SCIM 2.0 compatible providers:
+
+### Enterprise providers
+
+- **Okta**: Full SCIM 2.0 support
+- **Microsoft Entra ID**: Azure AD directory sync
+- **Google Workspace**: Google directory integration
+- **JumpCloud**: Cloud directory platform
+- **OneLogin**: Enterprise SSO and directory
+- **Ping Identity**: PingOne directory
+
+### SCIM-compatible systems
+
+Any SCIM 2.0 compatible directory:
+
+- Custom SCIM implementations
+- On-premises Active Directory (via Azure AD Connect)
+- LDAP directories (via SCIM gateway)
+
+## Use cases
+
+### Employee onboarding
+
+Automate new hire provisioning:
+
+1. HR adds employee to directory (Okta, Azure AD)
+2. SCIM webhook triggers `user_created` event
+3. Application creates user account automatically
+4. User assigned roles based on department groups
+5. Employee has access on day one
+
+### Employee offboarding
+
+Immediate access revocation:
+
+1. HR deactivates employee in directory
+2. SCIM webhook triggers `user_deleted` event
+3. Application deactivates user account
+4. Access removed within seconds
+5. Compliance requirement met
+
+### Role changes
+
+Automatic permission updates:
+
+1. Employee changes departments
+2. IT updates group membership in directory
+3. SCIM webhook triggers `user_updated` event
+4. Application updates user roles
+5. New permissions applied immediately
+
+### Bulk user imports
+
+Initial customer onboarding:
+
+```javascript
+// Fetch all users during onboarding
+const { users } = await scalekit.directory.listDirectoryUsers(orgId, dirId);
+
+// Bulk create accounts
+for (const user of users) {
+  await createUserAccount({
+    email: user.email,
+    name: user.name,
+    groups: user.groups,
+    status: user.active ? 'active' : 'inactive'
+  });
+}
+```
+
+## Integration strategies
+
+### Webhook-first approach
+
+Real-time provisioning:
+
+**Advantages:**
+
+- Instant user lifecycle updates
+- Minimal API calls
+- Event-driven architecture
+- Scalable for large directories
+
+**Best for:**
+
+- Applications requiring immediate access control
+- Security-sensitive environments
+- Compliance requirements
+
+### API-based sync
+
+Scheduled synchronization:
+
+**Advantages:**
+
+- Reliable reconciliation
+- Handles missed webhooks
+- Batch processing
+- Simpler implementation
+
+**Best for:**
+
+- Non-critical user updates
+- Batch processing workflows
+- Periodic data validation
+
+### Hybrid approach
+
+Combine webhooks and APIs:
+
+```javascript
+// Real-time updates via webhooks
+app.post('/webhook', async (req, res) => {
+  await processWebhookEvent(req.body);
+  res.status(201).send();
+});
+
+// Daily reconciliation via API
+cron.schedule('0 2 * * *', async () => {
+  await syncAllDirectoryUsers();
+});
+```
+
+Provides:
+
+- Real-time updates for critical changes
+- Daily reconciliation for data integrity
+- Resilience against missed webhooks
+- Audit trail for compliance
+
+## Webhook delivery
+
+Reliable event delivery:
+
+### Retry policy
+
+Exponential backoff until 200/201 response:
+
+| Attempt | Timing |
+|---------|--------|
+| 1 | Immediate |
+| 2 | 5 seconds |
+| 3 | 5 minutes |
+| 4 | 30 minutes |
+| 5 | 2 hours |
+| 6 | 5 hours |
+| 7 | 10 hours |
+| 8 | 10 hours |
+
+### Signature verification
+
+Always verify webhook authenticity:
+
+```javascript
+// Security: Verify webhook signature
+try {
+  await scalekit.verifyWebhookPayload(secret, headers, event);
+} catch (error) {
+  // Invalid signature - reject request
+  return res.status(400).json({ error: 'Invalid signature' });
+}
+```
+
+Protects against:
+
+- Unauthorized webhook calls
+- Replay attacks
+- Forged provisioning requests
+
+## Customer onboarding
+
+### Set up organization
+
+Create organization for enterprise customer:
+
+```javascript
+const org = await scalekit.organization.create({
+  display_name: 'ACME Corporation',
+  external_id: 'customer_123'
+});
+```
+
+### Provide admin portal
+
+Generate portal link for IT admin:
+
+```javascript
+const portalLink = await scalekit.organization.generatePortalLink(org.id);
+
+// Send to customer IT admin
+sendEmail(itAdmin, {
+  subject: 'Configure User Provisioning',
+  body: `Set up directory sync: ${portalLink.location}`
+});
+```
+
+### Customer configures SCIM
+
+IT admin uses admin portal to:
+
+1. Click "Configure Directory Sync"
+2. Copy SCIM endpoint URL and token
+3. Add to directory provider (Okta, Azure AD)
+4. Test connection
+5. Enable provisioning
+
+### Initial sync completes
+
+Directory provider sends all users:
+
+1. SCIM sends user batch to Scalekit
+2. Scalekit triggers `user_created` webhooks
+3. Your application processes events
+4. Users provisioned in application
+5. Customer confirms sync successful
+
+## Security and compliance
+
+### SCIM security
+
+- **Bearer token authentication**: Secure SCIM endpoint access
+- **TLS encryption**: All SCIM traffic encrypted
+- **Token rotation**: Regular credential updates
+- **IP allowlisting**: Optional network restrictions
+
+### Webhook security
+
+- **Signature verification**: Cryptographic signature validation
+- **HTTPS only**: Encrypted webhook delivery
+- **Replay protection**: Timestamp validation
+- **Secret rotation**: Webhook secret management
+
+### Compliance
+
+- **Audit logging**: Complete provisioning history
+- **Data residency**: US and EU regions
+- **SOC 2 certified**: Enterprise security standards
+- **GDPR compliant**: Privacy-focused processing
+
+## Benefits
+
+### IT efficiency
+
+- **Zero manual provisioning**: Automated user lifecycle
+- **Immediate deprovisioning**: Security compliance
+- **Reduced errors**: No manual data entry
+- **Time savings**: Hours to minutes
+
+### Security
+
+- **Prompt access revocation**: Immediate offboarding
+- **Accurate permissions**: Synchronized with HR
+- **Audit trail**: Complete provisioning history
+- **Compliance**: Meet regulatory requirements
+
+### User experience
+
+- **Day-one access**: New hires provisioned automatically
+- **Accurate profiles**: Synchronized with directory
+- **Seamless transitions**: Role changes applied instantly
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Quickstart guide" icon="rocket" href="/directory/scim/quickstart">
+    Set up SCIM provisioning in 30 minutes
+  </Card>
+  
+  <Card title="SCIM basics" icon="book" href="/directory/guides/user-provisioning-basics">
+    Learn how SCIM provisioning works
+  </Card>
+  
+  <Card title="Webhook events" icon="webhook" href="/directory/reference/directory-events">
+    View all directory webhook events
+  </Card>
+  
+  <Card title="Group-based RBAC" icon="shield" href="/directory/guides/group-based-role-assignment">
+    Map groups to application roles
+  </Card>
+</CardGroup>
+
+## Related products
+
+- **[Modular SSO](/products/modular-sso)**: Add enterprise single sign-on
+- **[Full-stack Auth](/products/full-stack-auth)**: Complete authentication platform
+
+<Note>
+  SCIM provisioning works independently or alongside SSO. Many customers use both: SSO for authentication and SCIM for automated user provisioning.
+</Note>

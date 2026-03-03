@@ -1,0 +1,130 @@
+---
+title: 'Delete user'
+description: 'Permanently remove a user from your environment'
+---
+
+## DELETE /api/v1/users/{id}
+
+Permanently removes a user from your environment and deletes all associated data. Use this endpoint when you need to completely remove a user account. This action deletes the user's profile, memberships, and all related data across all organizations.
+
+<Warning>
+  This operation cannot be undone. All user data will be permanently deleted.
+</Warning>
+
+## Request
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  System-generated user ID. Must start with 'usr_' (19-25 characters).
+  
+  ```
+  usr_123
+  ```
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="external_id" type="string">
+  External system identifier from connected directories. Use this to delete a user by your own ID instead of Scalekit's ID.
+  
+  ```
+  ext_12345a67b89c
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="200" type="success">
+  User successfully deleted. No content returned.
+</ResponseField>
+
+## Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+await scalekit.user.deleteUser("usr_123");
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+from scalekit import ScalekitClient
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENV_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+scalekit_client.users.delete_user(
+    organization_id="org_123", 
+    user_id="usr_123"
+)
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENV_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+if err := scalekitClient.User().DeleteUser(ctx, "usr_123"); err != nil {
+    panic(err)
+}
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENV_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+scalekitClient.users().deleteUser("usr_123");
+```
+  </TabItem>
+
+  <TabItem label="cURL">
+```bash
+curl -X DELETE 'https://<SCALEKIT_ENV_URL>/api/v1/users/usr_123' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>'
+```
+  </TabItem>
+</Tabs>
+
+## Error Responses
+
+<ResponseField name="200" type="success">
+  User successfully deleted
+</ResponseField>
+
+<ResponseField name="404" type="error">
+  User not found
+</ResponseField>
+
+## What Gets Deleted
+
+When you delete a user, the following data is permanently removed:
+
+- User profile information (name, email, phone, etc.)
+- All organization memberships
+- User metadata and custom attributes
+- External identity connections
+- User sessions
+- Authentication history
+
+## Use Cases
+
+- **GDPR/Privacy Compliance**: Remove user data when requested
+- **Account Cleanup**: Delete test or inactive accounts
+- **Security**: Remove compromised accounts
+- **Offboarding**: Clean up departed employee accounts

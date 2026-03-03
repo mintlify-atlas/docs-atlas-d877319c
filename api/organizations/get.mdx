@@ -1,0 +1,138 @@
+---
+title: 'Get organization details'
+description: 'Retrieve details for a specific organization'
+---
+
+## GET /api/v1/organizations/{id}
+
+Retrieves organization details by Scalekit ID, including name, region, metadata, and settings.
+
+## Request
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Unique scalekit-generated identifier that uniquely references an organization.
+  
+  ```
+  org_59615193906282635
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="organization" type="object">
+  The complete organization object with ID, display name, settings, and metadata.
+
+  <Expandable title="organization object">
+    <ResponseField name="id" type="string">
+      Unique scalekit-generated identifier
+      
+      ```
+      org_59615193906282635
+      ```
+    </ResponseField>
+
+    <ResponseField name="display_name" type="string">
+      Name of the organization
+    </ResponseField>
+
+    <ResponseField name="external_id" type="string">
+      Your application's unique identifier for this organization
+    </ResponseField>
+
+    <ResponseField name="metadata" type="object">
+      Key-value pairs extension attributes
+    </ResponseField>
+
+    <ResponseField name="region_code" type="string">
+      Geographic region code. Currently limited to US.
+    </ResponseField>
+
+    <ResponseField name="create_time" type="string">
+      Timestamp when the organization was created (ISO 8601)
+      
+      ```
+      2025-02-15T06:23:44.560000Z
+      ```
+    </ResponseField>
+
+    <ResponseField name="update_time" type="string">
+      Timestamp when the organization was last updated (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="settings" type="object">
+      Organization settings including feature toggles for SSO and directory synchronization
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+const scalekit = new ScalekitClient(
+    process.env.SCALEKIT_ENV_URL,
+    process.env.SCALEKIT_CLIENT_ID,
+    process.env.SCALEKIT_CLIENT_SECRET
+);
+
+const organization = await scalekit.organization.getOrganization(organization_id);
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+from scalekit import ScalekitClient
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENV_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+organization = scalekit_client.organization.get_organization(
+    organization_id
+)
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENV_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+organization, err := scalekitClient.Organization.GetOrganization(
+    ctx,
+    organizationId,
+)
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+import com.scalekit.grpc.scalekit.v1.organizations.*;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENV_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+Organization organization = scalekitClient.organizations().getById(organizationId);
+```
+  </TabItem>
+
+  <TabItem label="cURL">
+```bash
+curl -X GET 'https://<SCALEKIT_ENV_URL>/api/v1/organizations/{organization_id}' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>' \
+  -H 'Accept: application/json'
+```
+  </TabItem>
+</Tabs>

@@ -1,0 +1,299 @@
+---
+title: 'Rate Limits'
+description: 'API rate limiting policies and best practices'
+---
+
+## Overview
+
+Scalekit implements rate limiting to ensure fair usage and maintain API availability for all customers. Rate limits protect the API infrastructure from abuse and ensure consistent performance.
+
+## Rate Limit Policy
+
+Rate limits are applied per environment and are calculated based on:
+
+- **API endpoint**: Different endpoints may have different rate limits
+- **Authentication credentials**: Limits are tracked per client_id
+- **Time window**: Limits reset after a specific time period
+
+<Note>
+  Rate limits may vary based on your Scalekit plan. Contact support for enterprise rate limit requirements.
+</Note>
+
+## Rate Limit Headers
+
+API responses include rate limit information in the response headers:
+
+<ResponseField name="X-RateLimit-Limit" type="integer">
+  Maximum number of requests allowed in the current time window
+</ResponseField>
+
+<ResponseField name="X-RateLimit-Remaining" type="integer">
+  Number of requests remaining in the current time window
+</ResponseField>
+
+<ResponseField name="X-RateLimit-Reset" type="integer">
+  Unix timestamp when the rate limit window resets
+</ResponseField>
+
+### Example Response Headers
+
+```http
+HTTP/1.1 200 OK
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1704067200
+```
+
+## Rate Limit Exceeded
+
+When you exceed the rate limit, the API returns a `429 Too Many Requests` error:
+
+```json
+{
+  "code": 429,
+  "message": "Rate limit exceeded",
+  "details": [
+    {
+      "@type": "type.googleapis.com/scalekit.v1.errdetails.ErrorInfo",
+      "error_code": "RATE_LIMIT_EXCEEDED",
+      "retry_after": 60
+    }
+  ]
+}
+```
+
+<ResponseField name="retry_after" type="integer">
+  Number of seconds to wait before retrying the request
+</ResponseField>
+
+## Best Practices
+
+### Monitor Rate Limit Headers
+
+Always check rate limit headers in API responses to avoid hitting limits:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+    ```javascript
+    const scalekit = new Scalekit(
+      process.env.SCALEKIT_ENVIRONMENT_URL,
+      process.env.SCALEKIT_CLIENT_ID,
+      process.env.SCALEKIT_CLIENT_SECRET
+    )
+
+    try {
+      const response = await scalekit.organization.listOrganization()
+      
+      // Check rate limit headers (if exposed by SDK)
+      console.log('Rate limit remaining:', response.headers?.['x-ratelimit-remaining'])
+    } catch (error) {
+      if (error.status === 429) {
+        // Handle rate limit error
+        const retryAfter = error.headers?.['retry-after']
+        console.log(`Rate limited. Retry after ${retryAfter} seconds`)
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+    import time
+    from scalekit import ScalekitClient
+
+    scalekit_client = ScalekitClient(
+        env_url=os.getenv('SCALEKIT_ENVIRONMENT_URL'),
+        client_id=os.getenv('SCALEKIT_CLIENT_ID'),
+        client_secret=os.getenv('SCALEKIT_CLIENT_SECRET')
+    )
+
+    try:
+        response = scalekit_client.organization.list_organizations()
+        # Process response
+    except Exception as error:
+        if hasattr(error, 'status') and error.status == 429:
+            # Handle rate limit error
+            retry_after = error.headers.get('retry-after', 60)
+            print(f'Rate limited. Retry after {retry_after} seconds')
+            time.sleep(int(retry_after))
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "context"
+        "fmt"
+        "os"
+        "time"
+        "github.com/scalekit-inc/scalekit-sdk-go"
+    )
+
+    scalekitClient := scalekit.NewScalekitClient(
+        os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+        os.Getenv("SCALEKIT_CLIENT_ID"),
+        os.Getenv("SCALEKIT_CLIENT_SECRET"),
+    )
+
+    ctx := context.Background()
+    response, err := scalekitClient.Organization.ListOrganizations(
+        ctx,
+        &scalekit.ListOrganizationOptions{PageSize: 10},
+    )
+
+    if err != nil {
+        // Check for rate limit error
+        if err.Error() == "429" {
+            fmt.Println("Rate limited. Retrying after delay...")
+            time.Sleep(60 * time.Second)
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Java">
+    ```java
+    import com.scalekit.ScalekitClient;
+
+    ScalekitClient scalekitClient = new ScalekitClient(
+        System.getenv("SCALEKIT_ENVIRONMENT_URL"),
+        System.getenv("SCALEKIT_CLIENT_ID"),
+        System.getenv("SCALEKIT_CLIENT_SECRET")
+    );
+
+    try {
+        ListOrganizationsResponse response = scalekitClient
+            .organizations()
+            .listOrganizations(10, "");
+    } catch (Exception error) {
+        // Handle rate limit error
+        if (error.getMessage().contains("429")) {
+            System.out.println("Rate limited. Retry after delay");
+            Thread.sleep(60000); // Wait 60 seconds
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+### Implement Exponential Backoff
+
+When you encounter rate limits, use exponential backoff to retry requests:
+
+```javascript
+async function makeRequestWithBackoff(requestFn, maxRetries = 3) {
+  let retries = 0
+  
+  while (retries < maxRetries) {
+    try {
+      return await requestFn()
+    } catch (error) {
+      if (error.status === 429 && retries < maxRetries - 1) {
+        const backoffTime = Math.pow(2, retries) * 1000 // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, backoffTime))
+        retries++
+      } else {
+        throw error
+      }
+    }
+  }
+}
+
+// Usage
+const organizations = await makeRequestWithBackoff(() =>
+  scalekit.organization.listOrganization()
+)
+```
+
+### Batch Requests
+
+When possible, use batch operations or pagination to reduce the number of API calls:
+
+```javascript
+// Instead of making multiple individual requests
+for (const orgId of organizationIds) {
+  await scalekit.organization.getOrganization(orgId) // Multiple API calls
+}
+
+// Use pagination to fetch multiple resources in one request
+const organizations = await scalekit.organization.listOrganization({
+  pageSize: 100 // Fetch up to 100 organizations per request
+})
+```
+
+### Cache Responses
+
+Cache API responses when appropriate to reduce redundant requests:
+
+```javascript
+const cache = new Map()
+const CACHE_TTL = 300000 // 5 minutes
+
+async function getCachedOrganization(organizationId) {
+  const cacheKey = `org_${organizationId}`
+  const cached = cache.get(cacheKey)
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data
+  }
+  
+  const organization = await scalekit.organization.getOrganization(organizationId)
+  cache.set(cacheKey, { data: organization, timestamp: Date.now() })
+  
+  return organization
+}
+```
+
+## Rate Limit Tiers
+
+Different API endpoints may have different rate limits based on their resource intensity:
+
+| Endpoint Category | Typical Limit | Notes |
+|------------------|---------------|-------|
+| Read operations | Higher limits | GET requests for listing and retrieving resources |
+| Write operations | Moderate limits | POST, PUT, PATCH requests for creating/updating resources |
+| Delete operations | Lower limits | DELETE requests for removing resources |
+| Authentication | Special limits | Token generation and validation endpoints |
+
+<Note>
+  Contact Scalekit support if you need higher rate limits for your use case.
+</Note>
+
+## Handling Rate Limits in Production
+
+### Queue-Based Architecture
+
+For high-volume applications, implement a queue-based system:
+
+1. Add API requests to a queue
+2. Process requests at a controlled rate
+3. Monitor rate limit headers
+4. Adjust processing speed based on remaining quota
+
+### Distributed Rate Limiting
+
+If your application runs on multiple servers, coordinate rate limiting across instances:
+
+- Use a shared cache (Redis, Memcached) to track API usage
+- Distribute quota across application instances
+- Implement circuit breakers to prevent cascading failures
+
+## Monitoring and Alerts
+
+Set up monitoring to track rate limit usage:
+
+- Log rate limit headers from API responses
+- Alert when remaining quota drops below a threshold
+- Track 429 errors in your application logs
+- Monitor retry patterns and backoff behavior
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Overview" icon="book" href="/api/overview">
+    Learn about API structure and versioning
+  </Card>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Set up API authentication
+  </Card>
+</CardGroup>

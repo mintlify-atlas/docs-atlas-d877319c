@@ -1,0 +1,304 @@
+---
+title: Full-stack authentication
+description: Complete authentication solution with hosted login pages, session management, and user lifecycle APIs
+---
+
+Full-stack authentication provides a complete identity layer for your B2B application, including hosted login pages, secure session management, user lifecycle APIs, and organization modeling. Use Scalekit as your complete authentication platform to manage users, organizations, sessions, and roles.
+
+## What you get
+
+Full-stack auth handles every aspect of user authentication and management:
+
+- **Hosted authentication pages**: Production-ready login and signup pages that match your brand
+- **Session management**: Secure token handling, automatic refresh, and configurable session policies
+- **User lifecycle APIs**: Create, update, and manage user accounts programmatically
+- **Organization modeling**: Multi-tenant architecture with workspace and team management
+- **Multiple auth methods**: Passkeys, magic links, OTPs, social logins, and enterprise SSO
+- **Authorization**: Role-based access control (RBAC) with permissions for users and AI agents
+
+## Key features
+
+### Complete user management
+
+Manage the full user lifecycle with built-in APIs:
+
+- Create and provision user accounts
+- Update user profiles and attributes
+- Handle user invitations and onboarding
+- Deactivate or delete user accounts
+- Track user activity and authentication events
+
+### B2B-native identity
+
+Model organizations and multi-tenant access:
+
+- Create and manage organizations (workspaces, teams)
+- Handle user memberships across organizations
+- Organization-level settings and configurations
+- Multi-tenant access patterns
+- Organization identifiers and domain management
+
+### Modern authentication methods
+
+Support passwordless and traditional authentication:
+
+```javascript
+// Redirect users to hosted authentication page
+const authorizationUrl = scalekit.getAuthorizationUrl(redirectUri, {
+  scopes: ['openid', 'profile', 'email', 'offline_access']
+});
+
+res.redirect(authorizationUrl);
+```
+
+Users can authenticate via:
+
+- **Passkeys**: WebAuthn-based biometric authentication
+- **Magic links**: One-click email authentication
+- **OTP codes**: Time-based one-time passwords
+- **Social logins**: Google, Microsoft, GitHub, and more
+- **Enterprise SSO**: SAML and OIDC for enterprise customers
+
+### Secure session management
+
+Automatic token lifecycle management:
+
+```javascript
+// Exchange authorization code for user profile and tokens
+const authResult = await scalekit.authenticateWithCode(code, redirectUri);
+
+const { user, idToken, accessToken, refreshToken } = authResult;
+
+// Store tokens securely
+res.cookie('accessToken', accessToken, {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'strict'
+});
+```
+
+The SDK handles:
+
+- Access token validation and refresh
+- Refresh token rotation
+- Session expiration policies
+- Logout and session invalidation
+
+### Hosted login pages
+
+Customizable authentication UI:
+
+- White-label branding with your logo and colors
+- Customizable email templates
+- Support for multiple authentication methods
+- Mobile-responsive design
+- Accessibility compliant
+
+## Use cases
+
+### B2B SaaS applications
+
+Build multi-tenant SaaS products:
+
+- Workspace-based applications
+- Team collaboration tools
+- Project management platforms
+- CRM and business tools
+
+### Enterprise applications
+
+Meet enterprise authentication requirements:
+
+- Single sign-on (SSO) with Okta, Azure AD, Google Workspace
+- SCIM provisioning for automated user management
+- Audit logging and compliance
+- Custom session policies
+
+### AI applications
+
+Authenticate users and AI agents:
+
+- User authentication for AI chat interfaces
+- Agent authorization with scoped permissions
+- API authentication for M2M integrations
+- Model Context Protocol (MCP) server authentication
+
+## How it works
+
+### Authentication flow
+
+1. **User initiates sign-in**: Your app redirects to Scalekit's hosted auth page
+2. **Identity verification**: User authenticates via their preferred method (passkey, magic link, SSO)
+3. **Secure callback**: Scalekit returns verified user profile and session tokens
+4. **Session creation**: Your app establishes a secure user session
+5. **Protected access**: User accesses your application's features
+
+### Complete callback handling
+
+```javascript
+// Handle authentication callback
+app.get('/auth/callback', async (req, res) => {
+  const { code, error } = req.query;
+
+  if (error) {
+    return res.status(401).json({ error });
+  }
+
+  // Exchange code for user profile and tokens
+  const authResult = await scalekit.authenticateWithCode(code, redirectUri);
+
+  // Create user session
+  req.session.user = authResult.user;
+  
+  res.redirect('/dashboard');
+});
+```
+
+### Token management
+
+```javascript
+// Middleware to verify and refresh tokens
+const verifyToken = async (req, res, next) => {
+  const accessToken = req.cookies.accessToken;
+  
+  const isValid = await scalekit.validateAccessToken(accessToken);
+  
+  if (!isValid) {
+    // Refresh expired token
+    const refreshToken = req.cookies.refreshToken;
+    const newTokens = await scalekit.refreshAccessToken(refreshToken);
+    
+    // Update cookies with new tokens
+    res.cookie('accessToken', newTokens.accessToken);
+  }
+  
+  next();
+};
+```
+
+## Integration paths
+
+### Start from scratch
+
+New applications can adopt full-stack auth completely:
+
+1. Install Scalekit SDK
+2. Configure redirect URLs in dashboard
+3. Implement login and callback endpoints
+4. Add session verification middleware
+5. Implement logout functionality
+
+### Migrate existing users
+
+Migrate from existing authentication systems:
+
+- Bulk import users via API
+- Password migration with transparent hash conversion
+- Gradual rollout with feature flags
+- Preserve existing user sessions during migration
+
+### Add enterprise features
+
+Extend authentication with enterprise capabilities:
+
+- Enable SSO for enterprise customers
+- Add SCIM provisioning for automated user management
+- Configure custom session policies
+- Implement role-based access control
+
+## Session policies
+
+Configure session behavior in the Scalekit dashboard:
+
+- **Access token lifetime**: 5 minutes to 1 hour (default: 5 minutes)
+- **Refresh token lifetime**: 7 days to 90 days (default: 30 days)
+- **Session inactivity timeout**: Automatic logout after inactivity
+- **Concurrent session limits**: Control simultaneous sessions per user
+
+## Extensibility
+
+### Webhooks
+
+Receive real-time events for authentication and user lifecycle:
+
+- User created, updated, or deleted
+- User logged in or logged out
+- Session created or expired
+- Organization events
+- SSO connection events
+
+### Interceptors
+
+Apply custom logic during authentication flows:
+
+- Pre-authentication checks
+- Post-authentication data enrichment
+- Custom authorization rules
+- Fraud detection integration
+- Third-party service integration
+
+### Custom branding
+
+Customize hosted pages and emails:
+
+- Upload your logo and brand colors
+- Customize email templates
+- Add custom CSS for advanced styling
+- Configure custom domains
+
+## Benefits
+
+### Developer experience
+
+- **Quick integration**: Production-ready auth in hours, not weeks
+- **Comprehensive SDKs**: Node.js, Python, Go, and Java support
+- **Flexible architecture**: Use as complete platform or add modular features
+- **Extensive documentation**: Step-by-step guides and code examples
+
+### Security and compliance
+
+- **OAuth 2.1 standard**: Industry-standard authentication protocol
+- **SOC 2 certified**: Enterprise-grade security standards
+- **GDPR compliant**: Privacy-focused data handling
+- **Multi-region support**: US and EU data residency
+- **99.99% uptime**: Production-ready reliability
+
+### Scalability
+
+- **Built for growth**: Scales from startup to enterprise
+- **Performance optimized**: Fast authentication flows
+- **Global infrastructure**: Low-latency worldwide
+- **High availability**: Redundant, fault-tolerant architecture
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Quickstart guide" icon="rocket" href="/authenticate/fsa/quickstart">
+    Implement complete authentication in 30 minutes
+  </Card>
+  
+  <Card title="User management" icon="users" href="/fsa/data-modelling">
+    Learn about users, organizations, and data modeling
+  </Card>
+  
+  <Card title="Session management" icon="key" href="/authenticate/fsa/manage-session">
+    Configure session policies and token lifecycle
+  </Card>
+  
+  <Card title="Code samples" icon="code" href="/authenticate/fsa/code-samples">
+    Browse complete integration examples
+  </Card>
+</CardGroup>
+
+## Related features
+
+Full-stack auth works seamlessly with other Scalekit products:
+
+- **[Enterprise SSO](/products/modular-sso)**: Add SAML/OIDC for enterprise customers
+- **[SCIM Provisioning](/products/modular-scim)**: Automate user lifecycle management
+- **[MCP Auth](/products/mcp-auth)**: Secure Model Context Protocol servers
+- **[Agent Auth](/products/agent-auth)**: OAuth for AI agents and third-party integrations
+
+<Note>
+  Full-stack auth includes SSO and session management by default. If you only need SSO without complete user management, consider [Modular SSO](/products/modular-sso) instead.
+</Note>

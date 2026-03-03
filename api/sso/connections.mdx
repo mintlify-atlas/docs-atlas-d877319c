@@ -1,0 +1,83 @@
+---
+title: SSO connections
+description: Manage enterprise SSO connections via API
+---
+
+Create and manage enterprise SSO connections for your customers.
+
+## Endpoints
+
+### List connections
+
+Retrieve all SSO connections for an organization.
+
+```http
+GET /api/v1/organizations/{organizationId}/connections
+```
+
+**Response**:
+```json
+{
+  "connections": [
+    {
+      "id": "conn_1234567890",
+      "type": "SAML",
+      "provider": "okta",
+      "status": "active",
+      "createdAt": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+### Create connection
+
+Create a new SSO connection.
+
+```http
+POST /api/v1/organizations/{organizationId}/connections
+```
+
+**Request body**:
+```json
+{
+  "type": "SAML",
+  "provider": "okta",
+  "enabled": true
+}
+```
+
+### Get connection
+
+Retrieve a specific connection.
+
+```http
+GET /api/v1/connections/{connectionId}
+```
+
+### Update connection
+
+Update connection configuration.
+
+```http
+PATCH /api/v1/connections/{connectionId}
+```
+
+### Delete connection
+
+Remove an SSO connection.
+
+```http
+DELETE /api/v1/connections/{connectionId}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SAML configuration" icon="file-lines" href="/api/sso/saml-configuration">
+    SAML connection setup
+  </Card>
+  <Card title="OIDC configuration" icon="file-lines" href="/api/sso/oidc-configuration">
+    OIDC connection setup
+  </Card>
+</CardGroup>

@@ -1,0 +1,182 @@
+---
+title: 'List organizations'
+description: 'Retrieve a paginated list of organizations in your environment'
+---
+
+## GET /api/v1/organizations
+
+Retrieves a paginated list of organizations within your environment. The response includes a `next_page_token` that can be used to access subsequent pages of results.
+
+## Request
+
+### Query Parameters
+
+<ParamField query="page_size" type="integer">
+  Maximum number of organizations to return per page. Must be between 10 and 100.
+  
+  ```
+  50
+  ```
+</ParamField>
+
+<ParamField query="page_token" type="string">
+  Pagination token from the previous response. Use to retrieve the next page of organizations.
+  
+  ```
+  eyJwYWdlIjogMiwgImxhc3RfaWQiOiAib3JnXzEyMzQ1In0=
+  ```
+</ParamField>
+
+<ParamField query="external_id" type="string">
+  Your application's unique identifier for this organization, used to link Scalekit with your system.
+  
+  ```
+  my_unique_id
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="organizations" type="array">
+  List of organization objects.
+
+  <Expandable title="organization object">
+    <ResponseField name="id" type="string">
+      Unique scalekit-generated identifier
+      
+      ```
+      org_59615193906282635
+      ```
+    </ResponseField>
+
+    <ResponseField name="display_name" type="string">
+      Name of the organization
+    </ResponseField>
+
+    <ResponseField name="external_id" type="string">
+      Your application's unique identifier for this organization
+    </ResponseField>
+
+    <ResponseField name="metadata" type="object">
+      Key-value pairs extension attributes
+    </ResponseField>
+
+    <ResponseField name="region_code" type="string">
+      Geographic region code. Currently limited to US.
+    </ResponseField>
+
+    <ResponseField name="create_time" type="string">
+      Timestamp when the organization was created (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="update_time" type="string">
+      Timestamp when the organization was last updated (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="settings" type="object">
+      Organization settings including feature toggles
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="next_page_token" type="string">
+  Pagination token for the next page of results. Use this token to fetch the next page.
+  
+  ```
+  <next_page_token>
+  ```
+</ResponseField>
+
+<ResponseField name="prev_page_token" type="string">
+  Pagination token for the previous page of results.
+  
+  ```
+  <prev_page_token>
+  ```
+</ResponseField>
+
+<ResponseField name="total_size" type="integer">
+  Total number of organizations in the environment.
+  
+  ```
+  30
+  ```
+</ResponseField>
+
+## Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+const organizations = await scalekit.organization.listOrganization({
+  pageSize: 50,
+});
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+from scalekit import ScalekitClient
+from scalekit.v1.organizations import ListOrganizationOptions
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENV_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+options = ListOrganizationOptions()
+options.page_size = 50
+
+organizations = scalekit_client.organization.list_organizations(
+    options=options
+)
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENV_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+organizations, err := scalekitClient.Organization.ListOrganizations(
+    ctx,
+    &scalekit.ListOrganizationOptions{
+        PageSize: 50,
+    },
+)
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+import com.scalekit.grpc.scalekit.v1.organizations.*;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENV_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+ListOrganizationsResponse organizations = scalekitClient.organizations().listOrganizations(50, "");
+```
+  </TabItem>
+
+  <TabItem label="cURL">
+```bash
+curl -X GET 'https://<SCALEKIT_ENV_URL>/api/v1/organizations?page_size=50' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>' \
+  -H 'Accept: application/json'
+```
+  </TabItem>
+</Tabs>
+
+## Error Responses
+
+<ResponseField name="400" type="error">
+  Invalid page token
+</ResponseField>

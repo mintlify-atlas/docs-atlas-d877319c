@@ -1,0 +1,491 @@
+---
+title: 'Session Management'
+description: 'Validate tokens, refresh sessions, and manage user authentication state'
+---
+
+## Overview
+
+Session management endpoints help you validate user sessions, refresh expired tokens, and maintain authentication state across your application. Proper session management is critical for security and user experience.
+
+## Validate Access Tokens
+
+Access tokens should be validated on every API request to ensure they are still valid and have not been revoked.
+
+### Token Validation Steps
+
+1. **Verify Token Signature**: Validate the JWT signature using Scalekit's public keys
+2. **Check Expiration**: Ensure the token has not expired (`exp` claim)
+3. **Verify Issuer**: Confirm the token was issued by Scalekit (`iss` claim)
+4. **Verify Audience**: Ensure the token is intended for your application (`aud` claim)
+5. **Check Claims**: Validate required claims are present and valid
+
+### Validation Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+    ```javascript
+    import { Scalekit } from '@scalekit-sdk/node'
+    import jwt from 'jsonwebtoken'
+
+    const scalekit = new Scalekit(
+      process.env.SCALEKIT_ENVIRONMENT_URL,
+      process.env.SCALEKIT_CLIENT_ID,
+      process.env.SCALEKIT_CLIENT_SECRET
+    )
+
+    // Security: Validate access token from request headers
+    async function validateAccessToken(token) {
+      try {
+        // SDK handles token validation internally
+        const decoded = await scalekit.validateToken(token)
+        
+        // Additional validation
+        if (decoded.exp < Date.now() / 1000) {
+          throw new Error('Token expired')
+        }
+        
+        return decoded
+      } catch (error) {
+        console.error('Token validation failed:', error.message)
+        throw new Error('Invalid or expired token')
+      }
+    }
+
+    // Middleware for protecting routes
+    async function authenticateRequest(req, res, next) {
+      const authHeader = req.headers.authorization
+      
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Missing or invalid authorization header' })
+      }
+      
+      const token = authHeader.substring(7)
+      
+      try {
+        const decoded = await validateAccessToken(token)
+        req.user = decoded // Attach user info to request
+        next()
+      } catch (error) {
+        return res.status(401).json({ error: error.message })
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+    from scalekit import ScalekitClient
+    from functools import wraps
+    from flask import request, jsonify
+
+    scalekit_client = ScalekitClient(
+        env_url=os.getenv('SCALEKIT_ENVIRONMENT_URL'),
+        client_id=os.getenv('SCALEKIT_CLIENT_ID'),
+        client_secret=os.getenv('SCALEKIT_CLIENT_SECRET')
+    )
+
+    # Security: Validate access token from request headers
+    def validate_access_token(token):
+        try:
+            # SDK handles token validation internally
+            decoded = scalekit_client.validate_token(token)
+            return decoded
+        except Exception as error:
+            raise ValueError(f'Invalid or expired token: {error}')
+
+    # Decorator for protecting routes
+    def require_auth(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            auth_header = request.headers.get('Authorization')
+            
+            if not auth_header or not auth_header.startswith('Bearer '):
+                return jsonify({'error': 'Missing or invalid authorization header'}), 401
+            
+            token = auth_header[7:]
+            
+            try:
+                decoded = validate_access_token(token)
+                request.user = decoded  # Attach user info to request
+                return f(*args, **kwargs)
+            except ValueError as error:
+                return jsonify({'error': str(error)}), 401
+        
+        return decorated_function
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "context"
+        "errors"
+        "net/http"
+        "os"
+        "strings"
+        "time"
+        "github.com/scalekit-inc/scalekit-sdk-go"
+    )
+
+    var scalekitClient = scalekit.NewScalekitClient(
+        os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+        os.Getenv("SCALEKIT_CLIENT_ID"),
+        os.Getenv("SCALEKIT_CLIENT_SECRET"),
+    )
+
+    // Security: Validate access token from request headers
+    func validateAccessToken(token string) (map[string]interface{}, error) {
+        ctx := context.Background()
+        
+        // SDK handles token validation internally
+        decoded, err := scalekitClient.ValidateToken(ctx, token)
+        if err != nil {
+            return nil, errors.New("invalid or expired token")
+        }
+        
+        return decoded, nil
+    }
+
+    // Middleware for protecting routes
+    func authenticateRequest(next http.HandlerFunc) http.HandlerFunc {
+        return func(w http.ResponseWriter, r *http.Request) {
+            authHeader := r.Header.Get("Authorization")
+            
+            if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+                http.Error(w, "Missing or invalid authorization header", http.StatusUnauthorized)
+                return
+            }
+            
+            token := strings.TrimPrefix(authHeader, "Bearer ")
+            
+            decoded, err := validateAccessToken(token)
+            if err != nil {
+                http.Error(w, err.Error(), http.StatusUnauthorized)
+                return
+            }
+            
+            // Attach user info to context
+            ctx := context.WithValue(r.Context(), "user", decoded)
+            next.ServeHTTP(w, r.WithContext(ctx))
+        }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Java">
+    ```java
+    import com.scalekit.ScalekitClient;
+    import java.util.Map;
+
+    public class AuthMiddleware {
+        private static ScalekitClient scalekitClient = new ScalekitClient(
+            System.getenv("SCALEKIT_ENVIRONMENT_URL"),
+            System.getenv("SCALEKIT_CLIENT_ID"),
+            System.getenv("SCALEKIT_CLIENT_SECRET")
+        );
+
+        // Security: Validate access token from request headers
+        public static Map<String, Object> validateAccessToken(String token) throws Exception {
+            try {
+                // SDK handles token validation internally
+                Map<String, Object> decoded = scalekitClient.validateToken(token);
+                return decoded;
+            } catch (Exception error) {
+                throw new Exception("Invalid or expired token: " + error.getMessage());
+            }
+        }
+
+        // Filter for protecting routes
+        public static void authenticateRequest(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws Exception {
+            String authHeader = request.getHeader("Authorization");
+            
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"error\": \"Missing or invalid authorization header\"}");
+                return;
+            }
+            
+            String token = authHeader.substring(7);
+            
+            try {
+                Map<String, Object> decoded = validateAccessToken(token);
+                request.setAttribute("user", decoded);
+                chain.doFilter(request, response);
+            } catch (Exception error) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"error\": \"" + error.getMessage() + "\"}");
+            }
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Refresh Tokens
+
+When access tokens expire, use refresh tokens to obtain new access tokens without requiring the user to log in again.
+
+### Refresh Token Endpoint
+
+<ParamField path="method" type="string" default="POST">
+  POST
+</ParamField>
+
+<ParamField path="url" type="string">
+  `{SCALEKIT_ENVIRONMENT_URL}/oauth/token`
+</ParamField>
+
+### Request Parameters
+
+<ParamField body="grant_type" type="string" required>
+  Use `refresh_token` for token refresh flow.
+</ParamField>
+
+<ParamField body="refresh_token" type="string" required>
+  The refresh token received during initial authentication.
+</ParamField>
+
+<ParamField body="client_id" type="string" required>
+  Your Scalekit application client ID.
+</ParamField>
+
+<ParamField body="client_secret" type="string" required>
+  Your Scalekit application client secret.
+</ParamField>
+
+### Refresh Token Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="cURL">
+    ```bash
+    curl -X POST "${SCALEKIT_ENVIRONMENT_URL}/oauth/token" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "grant_type=refresh_token" \
+      -d "refresh_token=${REFRESH_TOKEN}" \
+      -d "client_id=${SCALEKIT_CLIENT_ID}" \
+      -d "client_secret=${SCALEKIT_CLIENT_SECRET}"
+    ```
+  </TabItem>
+  <TabItem label="Node.js">
+    ```javascript
+    import { Scalekit } from '@scalekit-sdk/node'
+
+    const scalekit = new Scalekit(
+      process.env.SCALEKIT_ENVIRONMENT_URL,
+      process.env.SCALEKIT_CLIENT_ID,
+      process.env.SCALEKIT_CLIENT_SECRET
+    )
+
+    // Refresh access token using refresh token
+    async function refreshAccessToken(refreshToken) {
+      try {
+        const tokens = await scalekit.refreshToken(refreshToken)
+        
+        // Security: Store new tokens securely
+        console.log('New access token:', tokens.accessToken)
+        console.log('New refresh token:', tokens.refreshToken) // May be rotated
+        
+        return tokens
+      } catch (error) {
+        console.error('Token refresh failed:', error.message)
+        // Handle refresh failure - may need to re-authenticate user
+        throw error
+      }
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+    from scalekit import ScalekitClient
+
+    scalekit_client = ScalekitClient(
+        env_url=os.getenv('SCALEKIT_ENVIRONMENT_URL'),
+        client_id=os.getenv('SCALEKIT_CLIENT_ID'),
+        client_secret=os.getenv('SCALEKIT_CLIENT_SECRET')
+    )
+
+    # Refresh access token using refresh token
+    def refresh_access_token(refresh_token):
+        try:
+            tokens = scalekit_client.refresh_token(refresh_token)
+            
+            # Security: Store new tokens securely
+            access_token = tokens.access_token
+            new_refresh_token = tokens.refresh_token  # May be rotated
+            
+            return tokens
+        except Exception as error:
+            print(f'Token refresh failed: {error}')
+            # Handle refresh failure - may need to re-authenticate user
+            raise
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "context"
+        "fmt"
+        "os"
+        "github.com/scalekit-inc/scalekit-sdk-go"
+    )
+
+    scalekitClient := scalekit.NewScalekitClient(
+        os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+        os.Getenv("SCALEKIT_CLIENT_ID"),
+        os.Getenv("SCALEKIT_CLIENT_SECRET"),
+    )
+
+    // Refresh access token using refresh token
+    func refreshAccessToken(refreshToken string) (*scalekit.TokenResponse, error) {
+        ctx := context.Background()
+        
+        tokens, err := scalekitClient.RefreshToken(ctx, refreshToken)
+        if err != nil {
+            fmt.Printf("Token refresh failed: %v\n", err)
+            // Handle refresh failure - may need to re-authenticate user
+            return nil, err
+        }
+        
+        // Security: Store new tokens securely
+        fmt.Printf("New access token: %s\n", tokens.AccessToken)
+        fmt.Printf("New refresh token: %s\n", tokens.RefreshToken) // May be rotated
+        
+        return tokens, nil
+    }
+    ```
+  </TabItem>
+  <TabItem label="Java">
+    ```java
+    import com.scalekit.ScalekitClient;
+    import com.scalekit.models.TokenResponse;
+
+    ScalekitClient scalekitClient = new ScalekitClient(
+        System.getenv("SCALEKIT_ENVIRONMENT_URL"),
+        System.getenv("SCALEKIT_CLIENT_ID"),
+        System.getenv("SCALEKIT_CLIENT_SECRET")
+    );
+
+    // Refresh access token using refresh token
+    public TokenResponse refreshAccessToken(String refreshToken) throws Exception {
+        try {
+            TokenResponse tokens = scalekitClient.refreshToken(refreshToken);
+            
+            // Security: Store new tokens securely
+            String accessToken = tokens.getAccessToken();
+            String newRefreshToken = tokens.getRefreshToken(); // May be rotated
+            
+            return tokens;
+        } catch (Exception error) {
+            System.err.println("Token refresh failed: " + error.getMessage());
+            // Handle refresh failure - may need to re-authenticate user
+            throw error;
+        }
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Session Storage
+
+Store session data securely to maintain user authentication state:
+
+### Server-Side Sessions (Recommended)
+
+```javascript
+// Store session data server-side (recommended)
+import session from 'express-session'
+import RedisStore from 'connect-redis'
+import { createClient } from 'redis'
+
+const redisClient = createClient()
+await redisClient.connect()
+
+app.use(session({
+  store: new RedisStore({ client: redisClient }),
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: true, // HTTPS only
+    httpOnly: true, // Prevent XSS
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'strict' // CSRF protection
+  }
+}))
+
+// Store tokens in session
+app.post('/auth/callback', async (req, res) => {
+  const { code } = req.query
+  const tokens = await scalekit.authenticateWithCode(code, redirectUri)
+  
+  // Security: Store tokens in secure session
+  req.session.accessToken = tokens.accessToken
+  req.session.refreshToken = tokens.refreshToken
+  req.session.user = tokens.user
+  
+  res.redirect('/dashboard')
+})
+```
+
+### Client-Side Sessions (Use with Caution)
+
+<Warning>
+  **Security Warning**: Only store session data client-side if server-side storage is not feasible. Use secure, httpOnly cookies and never expose refresh tokens to client-side JavaScript.
+</Warning>
+
+```javascript
+// If you must store tokens client-side, use secure cookies
+import { serialize } from 'cookie'
+
+res.setHeader('Set-Cookie', [
+  serialize('access_token', tokens.accessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    maxAge: 3600,
+    path: '/'
+  }),
+  // NEVER expose refresh token to client-side JavaScript
+  serialize('refresh_token', tokens.refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    path: '/auth/refresh' // Restrict to refresh endpoint only
+  })
+])
+```
+
+## Session Security Best Practices
+
+<Warning>
+  **Critical Security Practices:**
+  
+  1. **Token Storage**: Store access tokens and refresh tokens securely. Never expose them in URLs, localStorage, or sessionStorage.
+  
+  2. **HTTPS Only**: Always use HTTPS in production. Session cookies must have the `secure` flag set.
+  
+  3. **HttpOnly Cookies**: Use httpOnly cookies to prevent XSS attacks from stealing tokens.
+  
+  4. **CSRF Protection**: Use SameSite cookie attribute and CSRF tokens for form submissions.
+  
+  5. **Token Rotation**: Implement refresh token rotation - issue a new refresh token each time an access token is refreshed.
+  
+  6. **Session Expiration**: Set appropriate session timeouts. Balance security with user experience.
+  
+  7. **Logout Handling**: Properly invalidate sessions on logout, including server-side session cleanup.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Logout" icon="right-from-bracket" href="/api/auth/logout">
+    Implement secure logout functionality
+  </Card>
+  <Card title="Rate Limits" icon="gauge" href="/api/rate-limits">
+    Understand API rate limiting
+  </Card>
+</CardGroup>

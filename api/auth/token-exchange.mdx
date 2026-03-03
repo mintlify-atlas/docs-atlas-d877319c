@@ -1,0 +1,375 @@
+---
+title: 'Token Exchange'
+description: 'Exchange authorization codes for access tokens and ID tokens'
+---
+
+## Overview
+
+The token exchange endpoint converts an authorization code into access tokens and ID tokens. This is the second step in the OAuth 2.0 authorization code flow, after receiving the authorization code from the [authorization URL](/api/auth/authorization-url).
+
+## Endpoint
+
+<ParamField path="method" type="string" default="POST">
+  POST
+</ParamField>
+
+<ParamField path="url" type="string">
+  `{SCALEKIT_ENVIRONMENT_URL}/oauth/token`
+</ParamField>
+
+## Request Headers
+
+<ParamField header="Content-Type" type="string" required>
+  Must be `application/x-www-form-urlencoded`
+</ParamField>
+
+## Request Parameters
+
+<ParamField body="grant_type" type="string" required>
+  OAuth grant type. Use `authorization_code` for exchanging authorization codes.
+</ParamField>
+
+<ParamField body="code" type="string" required>
+  The authorization code received from the authorization callback. This code is single-use and expires after a short period.
+</ParamField>
+
+<ParamField body="client_id" type="string" required>
+  Your Scalekit application client ID from the Dashboard.
+</ParamField>
+
+<ParamField body="client_secret" type="string" required>
+  Your Scalekit application client secret from the Dashboard.
+</ParamField>
+
+<ParamField body="redirect_uri" type="string" required>
+  The same redirect URI used in the authorization request. Must match exactly.
+</ParamField>
+
+## Request Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="cURL">
+    ```bash
+    curl -X POST "${SCALEKIT_ENVIRONMENT_URL}/oauth/token" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "grant_type=authorization_code" \
+      -d "code=${AUTHORIZATION_CODE}" \
+      -d "client_id=${SCALEKIT_CLIENT_ID}" \
+      -d "client_secret=${SCALEKIT_CLIENT_SECRET}" \
+      -d "redirect_uri=https://yourapp.com/auth/callback"
+    ```
+  </TabItem>
+  <TabItem label="Node.js">
+    ```javascript
+    import { Scalekit } from '@scalekit-sdk/node'
+
+    const scalekit = new Scalekit(
+      process.env.SCALEKIT_ENVIRONMENT_URL,
+      process.env.SCALEKIT_CLIENT_ID,
+      process.env.SCALEKIT_CLIENT_SECRET
+    )
+
+    // Exchange authorization code for tokens
+    // Typically called in your callback handler
+    const { code } = req.query // Extract code from callback URL
+
+    const tokens = await scalekit.authenticateWithCode(
+      code,
+      'https://yourapp.com/auth/callback'
+    )
+
+    // Security: Validate the tokens before using
+    console.log('Access Token:', tokens.accessToken)
+    console.log('ID Token:', tokens.idToken)
+    console.log('User Info:', tokens.user)
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+    from scalekit import ScalekitClient
+
+    scalekit_client = ScalekitClient(
+        env_url=os.getenv('SCALEKIT_ENVIRONMENT_URL'),
+        client_id=os.getenv('SCALEKIT_CLIENT_ID'),
+        client_secret=os.getenv('SCALEKIT_CLIENT_SECRET')
+    )
+
+    # Exchange authorization code for tokens
+    # Typically called in your callback handler
+    code = request.args.get('code')  # Extract code from callback URL
+
+    tokens = scalekit_client.authenticate_with_code(
+        code=code,
+        redirect_uri='https://yourapp.com/auth/callback'
+    )
+
+    # Security: Validate the tokens before using
+    access_token = tokens.access_token
+    id_token = tokens.id_token
+    user_info = tokens.user
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "context"
+        "os"
+        "github.com/scalekit-inc/scalekit-sdk-go"
+    )
+
+    scalekitClient := scalekit.NewScalekitClient(
+        os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+        os.Getenv("SCALEKIT_CLIENT_ID"),
+        os.Getenv("SCALEKIT_CLIENT_SECRET"),
+    )
+
+    // Exchange authorization code for tokens
+    // Typically called in your callback handler
+    code := r.URL.Query().Get("code") // Extract code from callback URL
+
+    ctx := context.Background()
+    tokens, err := scalekitClient.AuthenticateWithCode(
+        ctx,
+        code,
+        "https://yourapp.com/auth/callback",
+    )
+
+    if err != nil {
+        // Handle error
+        return
+    }
+
+    // Security: Validate the tokens before using
+    accessToken := tokens.AccessToken
+    idToken := tokens.IdToken
+    userInfo := tokens.User
+    ```
+  </TabItem>
+  <TabItem label="Java">
+    ```java
+    import com.scalekit.ScalekitClient;
+
+    ScalekitClient scalekitClient = new ScalekitClient(
+        System.getenv("SCALEKIT_ENVIRONMENT_URL"),
+        System.getenv("SCALEKIT_CLIENT_ID"),
+        System.getenv("SCALEKIT_CLIENT_SECRET")
+    );
+
+    // Exchange authorization code for tokens
+    // Typically called in your callback handler
+    String code = request.getParameter("code"); // Extract code from callback URL
+
+    TokenResponse tokens = scalekitClient.authenticateWithCode(
+        code,
+        "https://yourapp.com/auth/callback"
+    );
+
+    // Security: Validate the tokens before using
+    String accessToken = tokens.getAccessToken();
+    String idToken = tokens.getIdToken();
+    User userInfo = tokens.getUser();
+    ```
+  </TabItem>
+</Tabs>
+
+## Response
+
+<ResponseField name="access_token" type="string" required>
+  JWT access token for making authenticated API requests on behalf of the user.
+</ResponseField>
+
+<ResponseField name="token_type" type="string" required>
+  Always `Bearer` for OAuth 2.0 flows.
+</ResponseField>
+
+<ResponseField name="expires_in" type="integer" required>
+  Number of seconds until the access token expires.
+</ResponseField>
+
+<ResponseField name="id_token" type="string" required>
+  JWT ID token containing user identity information. Decode this token to access user claims.
+</ResponseField>
+
+<ResponseField name="refresh_token" type="string">
+  Refresh token for obtaining new access tokens. Only returned if offline_access scope was requested.
+</ResponseField>
+
+<ResponseField name="scope" type="string">
+  Space-separated list of granted OAuth scopes.
+</ResponseField>
+
+### Response Example
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6InNua181Ok4OTEyMjU2NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6InNua181Ok4OTEyMjU2NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "v1.refresh_token_abc123...",
+  "scope": "openid email profile"
+}
+```
+
+## ID Token Claims
+
+The ID token is a JWT that contains user identity information. Decode the token to access these claims:
+
+<ResponseField name="sub" type="string" required>
+  Unique identifier for the user (subject). Use this as the user ID in your application.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address. Only present if `email` scope was requested.
+</ResponseField>
+
+<ResponseField name="email_verified" type="boolean">
+  Whether the email address has been verified.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  User's full name. Only present if `profile` scope was requested.
+</ResponseField>
+
+<ResponseField name="given_name" type="string">
+  User's first name.
+</ResponseField>
+
+<ResponseField name="family_name" type="string">
+  User's last name.
+</ResponseField>
+
+<ResponseField name="picture" type="string">
+  URL of the user's profile picture.
+</ResponseField>
+
+<ResponseField name="iss" type="string" required>
+  Token issuer (your Scalekit environment URL).
+</ResponseField>
+
+<ResponseField name="aud" type="string" required>
+  Token audience (your client_id).
+</ResponseField>
+
+<ResponseField name="iat" type="integer" required>
+  Token issued at timestamp (Unix epoch).
+</ResponseField>
+
+<ResponseField name="exp" type="integer" required>
+  Token expiration timestamp (Unix epoch).
+</ResponseField>
+
+### Decoded ID Token Example
+
+```json
+{
+  "sub": "usr_2bqMbGm3qjJqXtEDzaUg6K1UiEr",
+  "email": "user@example.com",
+  "email_verified": true,
+  "name": "Jane Doe",
+  "given_name": "Jane",
+  "family_name": "Doe",
+  "picture": "https://example.com/photo.jpg",
+  "iss": "https://your-org.scalekit.dev",
+  "aud": "your_client_id",
+  "iat": 1704067200,
+  "exp": 1704070800
+}
+```
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error code indicating the type of error.
+</ResponseField>
+
+<ResponseField name="error_description" type="string">
+  Human-readable description of the error.
+</ResponseField>
+
+### Common Errors
+
+| Error Code | Description | Solution |
+|-----------|-------------|----------|
+| `invalid_grant` | Authorization code is invalid, expired, or already used | Request a new authorization code |
+| `invalid_client` | Client authentication failed | Verify client_id and client_secret |
+| `invalid_request` | Missing or invalid required parameters | Check all parameters are included |
+| `unsupported_grant_type` | Invalid grant_type parameter | Use `authorization_code` for this flow |
+| `redirect_uri_mismatch` | Redirect URI doesn't match authorization request | Ensure redirect_uri matches exactly |
+
+### Error Response Example
+
+```json
+{
+  "error": "invalid_grant",
+  "error_description": "Authorization code has expired or is invalid"
+}
+```
+
+## Security Considerations
+
+<Warning>
+  **Critical Security Practices:**
+  
+  1. **Token Validation**: Always validate tokens before trusting their contents. Verify the signature, issuer, audience, and expiration.
+  
+  2. **Secure Storage**: Store tokens securely. Never expose access tokens or refresh tokens in URLs, logs, or client-side code.
+  
+  3. **Client Secret**: Never expose your client_secret in client-side code. This exchange must happen server-side.
+  
+  4. **HTTPS Only**: Always use HTTPS for token exchange to prevent token interception.
+  
+  5. **Code Reuse**: Authorization codes are single-use. Attempting to reuse a code may indicate an attack.
+  
+  6. **Expiration**: Check token expiration times and refresh tokens before they expire.
+</Warning>
+
+## Token Validation
+
+Always validate tokens before using them:
+
+```javascript
+// Example token validation (Node.js)
+import jwt from 'jsonwebtoken'
+import jwksClient from 'jwks-rsa'
+
+const client = jwksClient({
+  jwksUri: `${process.env.SCALEKIT_ENVIRONMENT_URL}/.well-known/jwks.json`
+})
+
+function getKey(header, callback) {
+  client.getSigningKey(header.kid, (err, key) => {
+    const signingKey = key.publicKey || key.rsaPublicKey
+    callback(null, signingKey)
+  })
+}
+
+// Validate ID token
+jwt.verify(idToken, getKey, {
+  issuer: process.env.SCALEKIT_ENVIRONMENT_URL,
+  audience: process.env.SCALEKIT_CLIENT_ID
+}, (err, decoded) => {
+  if (err) {
+    console.error('Token validation failed:', err)
+    return
+  }
+  
+  // Token is valid, use decoded claims
+  console.log('User ID:', decoded.sub)
+  console.log('Email:', decoded.email)
+})
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Session Management" icon="clock" href="/api/auth/session-management">
+    Manage user sessions and validate tokens
+  </Card>
+  <Card title="Logout" icon="right-from-bracket" href="/api/auth/logout">
+    Implement secure logout functionality
+  </Card>
+</CardGroup>

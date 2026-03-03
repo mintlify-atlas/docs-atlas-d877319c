@@ -1,0 +1,58 @@
+---
+title: CLI tools
+description: Command-line tools for managing Scalekit resources
+---
+
+Scalekit CLI provides command-line access to Scalekit APIs.
+
+## Installation
+
+```bash
+npm install -g @scalekit/cli
+```
+
+## Authentication
+
+Authenticate the CLI:
+
+```bash
+scalekit login
+```
+
+## Common commands
+
+### List organizations
+
+```bash
+scalekit organizations list
+```
+
+### Create organization
+
+```bash
+scalekit organizations create --name "Acme Corp"
+```
+
+### List users
+
+```bash
+scalekit users list --organization org_123
+```
+
+### Manage SSO connections
+
+```bash
+scalekit connections list --organization org_123
+scalekit connections create --organization org_123 --type SAML
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    API documentation
+  </Card>
+  <Card title="SDKs" icon="terminal" href="/sdks/overview">
+    Official SDKs
+  </Card>
+</CardGroup>

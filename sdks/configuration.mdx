@@ -1,0 +1,495 @@
+---
+title: 'SDK Configuration'
+description: 'Configure Scalekit SDKs with environment credentials and customize SDK behavior'
+sidebar:
+  label: 'Configuration'
+  order: 8
+---
+
+Configure your Scalekit SDK with environment credentials and customize SDK behavior for your application needs.
+
+## Required Credentials
+
+All Scalekit SDKs require three configuration values:
+
+| Parameter | Description | Example |
+|-----------|-------------|----------|
+| **Environment URL** | Your Scalekit environment endpoint | `https://your-env.scalekit.com` |
+| **Client ID** | Your application's client identifier | `skc_12345678901234567` |
+| **Client Secret** | Your application's secret key | `test_sk_abc123...` |
+
+## Get Your Credentials
+
+Retrieve your credentials from the Scalekit dashboard:
+
+1. Log in to [Scalekit Dashboard](https://app.scalekit.com)
+2. Navigate to **Dashboard > Developers > API Configuration**
+3. Copy your Environment URL, Client ID, and Client Secret
+
+**Security:** Never commit credentials to version control. Always use environment variables.
+
+## Environment Variables
+
+Store credentials in environment variables:
+
+```bash title=".env"
+SCALEKIT_ENVIRONMENT_URL=https://your-env.scalekit.com
+SCALEKIT_CLIENT_ID=skc_12345678901234567
+SCALEKIT_CLIENT_SECRET=test_sk_abc123def456ghi789jkl
+```
+
+Add `.env` to your `.gitignore`:
+
+```bash title=".gitignore"
+.env
+.env.local
+.env.production
+```
+
+## SDK Initialization
+
+Initialize the SDK with your credentials:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript title="utils/scalekit.js"
+import { Scalekit } from '@scalekit-sdk/node';
+
+// Security: Load from environment variables, never hard-code
+export const scalekit = new Scalekit(
+  process.env.SCALEKIT_ENVIRONMENT_URL,
+  process.env.SCALEKIT_CLIENT_ID,
+  process.env.SCALEKIT_CLIENT_SECRET
+);
+```
+  </TabItem>
+  <TabItem label="Python">
+```python title="utils/scalekit.py"
+from scalekit import ScalekitClient
+import os
+
+# Security: Load from environment variables, never hard-code
+scalekit_client = ScalekitClient(
+    os.environ.get('SCALEKIT_ENVIRONMENT_URL'),
+    os.environ.get('SCALEKIT_CLIENT_ID'),
+    os.environ.get('SCALEKIT_CLIENT_SECRET')
+)
+```
+  </TabItem>
+  <TabItem label="Go">
+```go title="utils/scalekit.go"
+package utils
+
+import (
+    "os"
+    "github.com/scalekit-inc/scalekit-sdk-go"
+)
+
+// Security: Load from environment variables, never hard-code
+var scalekitClient, err = scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+func init() {
+    if err != nil {
+        panic(err)
+    }
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java title="config/ScalekitConfig.java"
+import com.scalekit.ScalekitClient;
+
+public class ScalekitConfig {
+    // Security: Load from environment variables, never hard-code
+    public static ScalekitClient createClient() {
+        return new ScalekitClient(
+            System.getenv("SCALEKIT_ENVIRONMENT_URL"),
+            System.getenv("SCALEKIT_CLIENT_ID"),
+            System.getenv("SCALEKIT_CLIENT_SECRET")
+        );
+    }
+}
+```
+  </TabItem>
+</Tabs>
+
+## Framework-Specific Configuration
+
+### Node.js with Express
+
+Load environment variables with dotenv:
+
+```javascript title="server.js"
+import 'dotenv/config';
+import express from 'express';
+import { scalekit } from './utils/scalekit.js';
+
+const app = express();
+
+// SDK is now available via imported scalekit instance
+app.get('/login', (req, res) => {
+  const url = scalekit.getAuthorizationUrl(...);
+  res.redirect(url);
+});
+```
+
+### Python with Flask
+
+Load environment variables with python-dotenv:
+
+```python title="app.py"
+from flask import Flask
+from dotenv import load_dotenv
+from utils.scalekit import scalekit_client
+
+load_dotenv()
+
+app = Flask(__name__)
+
+@app.route('/login')
+def login():
+    url = scalekit_client.get_authorization_url(...)
+    return redirect(url)
+```
+
+### Go with Gin
+
+Load environment variables with godotenv:
+
+```go title="main.go"
+package main
+
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/joho/godotenv"
+    "myapp/utils"
+)
+
+func main() {
+    godotenv.Load()
+
+    r := gin.Default()
+
+    r.GET("/login", func(c *gin.Context) {
+        url, _ := utils.scalekitClient.GetAuthorizationUrl(...)
+        c.Redirect(302, url.String())
+    })
+
+    r.Run(":8080")
+}
+```
+
+### Java with Spring Boot
+
+Configure in `application.properties`:
+
+```properties title="application.properties"
+scalekit.environment.url=${SCALEKIT_ENVIRONMENT_URL}
+scalekit.client.id=${SCALEKIT_CLIENT_ID}
+scalekit.client.secret=${SCALEKIT_CLIENT_SECRET}
+```
+
+Create a configuration bean:
+
+```java title="ScalekitConfig.java"
+import com.scalekit.ScalekitClient;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class ScalekitConfig {
+
+    @Value("${scalekit.environment.url}")
+    private String environmentUrl;
+
+    @Value("${scalekit.client.id}")
+    private String clientId;
+
+    @Value("${scalekit.client.secret}")
+    private String clientSecret;
+
+    @Bean
+    public ScalekitClient scalekitClient() {
+        return new ScalekitClient(
+            environmentUrl,
+            clientId,
+            clientSecret
+        );
+    }
+}
+```
+
+### Expo (React Native)
+
+Expo uses public configuration only (no client secret):
+
+```bash title=".env"
+EXPO_PUBLIC_SCALEKIT_ENVIRONMENT_URL=https://your-env.scalekit.com
+EXPO_PUBLIC_SCALEKIT_CLIENT_ID=skc_12345678901234567
+```
+
+```javascript title="utils/scalekit.js"
+import { Scalekit } from '@scalekit-sdk/expo';
+
+// Mobile apps use public configuration only
+export const scalekit = new Scalekit({
+  environmentUrl: process.env.EXPO_PUBLIC_SCALEKIT_ENVIRONMENT_URL,
+  clientId: process.env.EXPO_PUBLIC_SCALEKIT_CLIENT_ID,
+});
+```
+
+**Note:** Never include client secrets in mobile applications. The Expo SDK handles authentication securely without requiring the secret.
+
+## Configuration Validation
+
+Validate configuration on startup:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+function validateConfig() {
+  const required = [
+    'SCALEKIT_ENVIRONMENT_URL',
+    'SCALEKIT_CLIENT_ID',
+    'SCALEKIT_CLIENT_SECRET'
+  ];
+
+  const missing = required.filter(key => !process.env[key]);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}`
+    );
+  }
+}
+
+validateConfig();
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+import os
+import sys
+
+def validate_config():
+    required = [
+        'SCALEKIT_ENVIRONMENT_URL',
+        'SCALEKIT_CLIENT_ID',
+        'SCALEKIT_CLIENT_SECRET'
+    ]
+
+    missing = [key for key in required if not os.environ.get(key)]
+
+    if missing:
+        print(f"Missing required environment variables: {', '.join(missing)}")
+        sys.exit(1)
+
+validate_config()
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+import (
+    "fmt"
+    "os"
+)
+
+func validateConfig() error {
+    required := []string{
+        "SCALEKIT_ENVIRONMENT_URL",
+        "SCALEKIT_CLIENT_ID",
+        "SCALEKIT_CLIENT_SECRET",
+    }
+
+    var missing []string
+    for _, key := range required {
+        if os.Getenv(key) == "" {
+            missing = append(missing, key)
+        }
+    }
+
+    if len(missing) > 0 {
+        return fmt.Errorf("missing required environment variables: %v", missing)
+    }
+
+    return nil
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public class ConfigValidator {
+    public static void validateConfig() {
+        List<String> required = Arrays.asList(
+            "SCALEKIT_ENVIRONMENT_URL",
+            "SCALEKIT_CLIENT_ID",
+            "SCALEKIT_CLIENT_SECRET"
+        );
+
+        List<String> missing = new ArrayList<>();
+        for (String key : required) {
+            if (System.getenv(key) == null) {
+                missing.add(key);
+            }
+        }
+
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException(
+                "Missing required environment variables: " + String.join(", ", missing)
+            );
+        }
+    }
+}
+```
+  </TabItem>
+</Tabs>
+
+## Multiple Environments
+
+Manage different configurations for development, staging, and production:
+
+### Using Environment Files
+
+```bash title=".env.development"
+SCALEKIT_ENVIRONMENT_URL=https://dev-env.scalekit.com
+SCALEKIT_CLIENT_ID=skc_dev_12345
+SCALEKIT_CLIENT_SECRET=test_sk_dev_abc123
+```
+
+```bash title=".env.production"
+SCALEKIT_ENVIRONMENT_URL=https://prod-env.scalekit.com
+SCALEKIT_CLIENT_ID=skc_prod_67890
+SCALEKIT_CLIENT_SECRET=prod_sk_xyz789
+```
+
+### Load Based on Environment
+
+**Node.js:**
+```javascript
+import dotenv from 'dotenv';
+
+const env = process.env.NODE_ENV || 'development';
+dotenv.config({ path: `.env.${env}` });
+```
+
+**Python:**
+```python
+import os
+from dotenv import load_dotenv
+
+env = os.getenv('FLASK_ENV', 'development')
+load_dotenv(f'.env.{env}')
+```
+
+## Redirect URI Configuration
+
+Configure redirect URIs in the Scalekit dashboard:
+
+1. Navigate to **Dashboard > Developers > API Configuration**
+2. Add your redirect URIs:
+   - Development: `http://localhost:3000/auth/callback`
+   - Staging: `https://staging.yourapp.com/auth/callback`
+   - Production: `https://yourapp.com/auth/callback`
+   - Mobile: `myapp://auth/callback`
+
+**Security:** Only add trusted redirect URIs. Scalekit validates the redirect URI on each authentication request.
+
+## Security Best Practices
+
+### Rotate Credentials Regularly
+
+Rotate client secrets periodically:
+1. Generate new client secret in dashboard
+2. Update environment variables
+3. Deploy updated configuration
+4. Delete old client secret
+
+### Use Separate Credentials per Environment
+
+Never reuse credentials across environments:
+- Development environment: Use test credentials
+- Staging environment: Use staging credentials
+- Production environment: Use production credentials
+
+### Protect Environment Files
+
+Restrict access to environment files:
+```bash
+chmod 600 .env
+chmod 600 .env.production
+```
+
+### Use Secret Management Services
+
+For production, use secret management services:
+- AWS Secrets Manager
+- Google Cloud Secret Manager
+- Azure Key Vault
+- HashiCorp Vault
+
+**Example with AWS Secrets Manager (Node.js):**
+```javascript
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+
+async function getScalekitCredentials() {
+  const client = new SecretsManagerClient({ region: 'us-east-1' });
+  const response = await client.send(
+    new GetSecretValueCommand({ SecretId: 'scalekit/production' })
+  );
+  return JSON.parse(response.SecretString);
+}
+
+const credentials = await getScalekitCredentials();
+const scalekit = new Scalekit(
+  credentials.environmentUrl,
+  credentials.clientId,
+  credentials.clientSecret
+);
+```
+
+## Troubleshooting
+
+### Invalid Environment URL
+
+Ensure URL format is correct:
+- ✅ Correct: `https://your-env.scalekit.com`
+- ❌ Wrong: `your-env.scalekit.com` (missing https://)
+- ❌ Wrong: `https://your-env.scalekit.com/` (trailing slash)
+
+### Invalid Client Credentials
+
+Verify credentials match your dashboard:
+1. Check Client ID starts with `skc_`
+2. Check Client Secret starts with `test_sk_` (development) or `prod_sk_` (production)
+3. Ensure no extra whitespace in environment variables
+
+### Environment Variables Not Loading
+
+**Node.js:** Ensure dotenv is loaded before importing SDK:
+```javascript
+import 'dotenv/config'; // Load first
+import { scalekit } from './utils/scalekit.js'; // Then import SDK
+```
+
+**Python:** Call load_dotenv() before importing SDK:
+```python
+from dotenv import load_dotenv
+load_dotenv()  # Load first
+
+from utils.scalekit import scalekit_client  # Then import SDK
+```
+
+## Next Steps
+
+- [Review SDK documentation](/sdks/overview/)
+- [Explore code examples](/sdks/examples/)
+- [Understand error handling](/sdks/error-handling/)

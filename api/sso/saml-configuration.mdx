@@ -1,0 +1,67 @@
+---
+title: SAML configuration
+description: Configure SAML 2.0 connections
+---
+
+Configure SAML 2.0 SSO connections for enterprise identity providers.
+
+## SAML metadata
+
+Provide your SAML metadata to configure the connection.
+
+### Metadata URL
+
+Provide a URL to your IdP metadata:
+
+```json
+{
+  "metadataUrl": "https://idp.example.com/metadata"
+}
+```
+
+### Metadata XML
+
+Or upload metadata XML directly:
+
+```xml
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata">
+  <!-- IdP metadata -->
+</EntityDescriptor>
+```
+
+## Manual configuration
+
+Configure SAML connection manually:
+
+```json
+{
+  "ssoUrl": "https://idp.example.com/sso",
+  "certificate": "-----BEGIN CERTIFICATE-----\n...",
+  "entityId": "https://idp.example.com"
+}
+```
+
+## Attribute mapping
+
+Map SAML attributes to user profile:
+
+```json
+{
+  "attributeMapping": {
+    "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+    "firstName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+    "lastName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"
+  }
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SSO connections" icon="plug" href="/api/sso/connections">
+    Manage SSO connections
+  </Card>
+  <Card title="OIDC configuration" icon="file-lines" href="/api/sso/oidc-configuration">
+    Configure OIDC
+  </Card>
+</CardGroup>

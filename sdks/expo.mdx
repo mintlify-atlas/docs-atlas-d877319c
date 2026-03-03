@@ -1,0 +1,517 @@
+---
+title: 'Expo SDK'
+description: 'Official SDK for React Native applications built with Expo for mobile authentication'
+sidebar:
+  label: 'Expo'
+  order: 6
+---
+
+The official Scalekit SDK for React Native applications built with Expo. Enables mobile authentication flows with native capabilities and secure token storage.
+
+## Installation
+
+Install the SDK and required dependencies:
+
+```bash
+npx expo install @scalekit-sdk/expo expo-auth-session expo-secure-store
+```
+
+## Quick Start
+
+Initialize the Scalekit client in your app:
+
+```javascript title="utils/scalekit.js"
+import { Scalekit } from '@scalekit-sdk/expo';
+
+export const scalekit = new Scalekit({
+  environmentUrl: process.env.EXPO_PUBLIC_SCALEKIT_ENVIRONMENT_URL,
+  clientId: process.env.EXPO_PUBLIC_SCALEKIT_CLIENT_ID,
+});
+```
+
+**Note:** The Expo SDK uses public configuration (client ID and environment URL only). The client secret is never exposed in mobile apps.
+
+## Authentication Flow
+
+### Login with OAuth
+
+Initiate OAuth login using the device browser:
+
+```javascript title="LoginScreen.js"
+import { useState } from 'react';
+import { Button, View, Text } from 'react-native';
+import { scalekit } from './utils/scalekit';
+import * as WebBrowser from 'expo-web-browser';
+
+// Required for Expo Auth Session
+WebBrowser.maybeCompleteAuthSession();
+
+export default function LoginScreen() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleLogin = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Redirect URI configured in your app.json scheme
+      const redirectUri = 'myapp://auth/callback';
+
+      const result = await scalekit.login({
+        redirectUri,
+        scopes: ['openid', 'profile', 'email'],
+      });
+
+      if (result.type === 'success') {
+        const { user, accessToken, idToken } = result;
+
+        // Store tokens securely
+        await storeTokens(accessToken, idToken);
+
+        // Navigate to home screen
+        navigation.navigate('Home');
+      } else if (result.type === 'cancel') {
+        console.log('User cancelled login');
+      } else {
+        setError('Login failed');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View>
+      <Button
+        title={loading ? 'Logging in...' : 'Sign in with SSO'}
+        onPress={handleLogin}
+        disabled={loading}
+      />
+      {error && <Text style={{ color: 'red' }}>{error}</Text>}
+    </View>
+  );
+}
+```
+
+### Secure Token Storage
+
+Store tokens securely using Expo SecureStore:
+
+```javascript title="utils/tokenStorage.js"
+import * as SecureStore from 'expo-secure-store';
+
+export async function storeTokens(accessToken, refreshToken) {
+  try {
+    await SecureStore.setItemAsync('accessToken', accessToken);
+    if (refreshToken) {
+      await SecureStore.setItemAsync('refreshToken', refreshToken);
+    }
+  } catch (error) {
+    console.error('Failed to store tokens:', error);
+  }
+}
+
+export async function getAccessToken() {
+  try {
+    return await SecureStore.getItemAsync('accessToken');
+  } catch (error) {
+    console.error('Failed to retrieve access token:', error);
+    return null;
+  }
+}
+
+export async function getRefreshToken() {
+  try {
+    return await SecureStore.getItemAsync('refreshToken');
+  } catch (error) {
+    console.error('Failed to retrieve refresh token:', error);
+    return null;
+  }
+}
+
+export async function clearTokens() {
+  try {
+    await SecureStore.deleteItemAsync('accessToken');
+    await SecureStore.deleteItemAsync('refreshToken');
+  } catch (error) {
+    console.error('Failed to clear tokens:', error);
+  }
+}
+```
+
+## App Configuration
+
+### Configure Deep Linking
+
+Add the redirect URI scheme to your `app.json`:
+
+```json title="app.json"
+{
+  "expo": {
+    "scheme": "myapp",
+    "ios": {
+      "bundleIdentifier": "com.yourcompany.myapp"
+    },
+    "android": {
+      "package": "com.yourcompany.myapp"
+    }
+  }
+}
+```
+
+### Environment Variables
+
+Create a `.env` file:
+
+```bash title=".env"
+EXPO_PUBLIC_SCALEKIT_ENVIRONMENT_URL=https://your-env.scalekit.com
+EXPO_PUBLIC_SCALEKIT_CLIENT_ID=skc_your_client_id
+```
+
+**Security:** Never include client secrets in mobile apps. Use public configuration only.
+
+## Advanced Features
+
+### Login with Organization
+
+Route users to a specific organization:
+
+```javascript
+const result = await scalekit.login({
+  redirectUri: 'myapp://auth/callback',
+  scopes: ['openid', 'profile', 'email'],
+  organizationId: 'org_123456',
+});
+```
+
+### Login with Email Hint
+
+Pre-fill the user's email:
+
+```javascript
+const result = await scalekit.login({
+  redirectUri: 'myapp://auth/callback',
+  scopes: ['openid', 'profile', 'email'],
+  loginHint: 'user@example.com',
+});
+```
+
+### Logout
+
+Clear stored tokens and session:
+
+```javascript title="Logout"
+import { clearTokens } from './utils/tokenStorage';
+
+const handleLogout = async () => {
+  try {
+    await clearTokens();
+    // Navigate to login screen
+    navigation.navigate('Login');
+  } catch (error) {
+    console.error('Logout failed:', error);
+  }
+};
+```
+
+## Token Management
+
+### Validate Token
+
+Check if the stored token is valid:
+
+```javascript
+import { getAccessToken } from './utils/tokenStorage';
+import { scalekit } from './utils/scalekit';
+
+async function checkAuth() {
+  const accessToken = await getAccessToken();
+
+  if (!accessToken) {
+    // Not logged in
+    return false;
+  }
+
+  try {
+    const isValid = await scalekit.validateAccessToken(accessToken);
+    return isValid;
+  } catch (error) {
+    console.error('Token validation failed:', error);
+    return false;
+  }
+}
+```
+
+### Refresh Token
+
+Refresh expired tokens:
+
+```javascript
+import { getRefreshToken, storeTokens } from './utils/tokenStorage';
+import { scalekit } from './utils/scalekit';
+
+async function refreshAuthToken() {
+  const refreshToken = await getRefreshToken();
+
+  if (!refreshToken) {
+    throw new Error('No refresh token available');
+  }
+
+  try {
+    const result = await scalekit.refreshAccessToken(refreshToken);
+    await storeTokens(result.accessToken, result.refreshToken);
+    return result.accessToken;
+  } catch (error) {
+    console.error('Token refresh failed:', error);
+    // Clear tokens and redirect to login
+    await clearTokens();
+    throw error;
+  }
+}
+```
+
+## Making Authenticated Requests
+
+### API Client with Token
+
+Create an authenticated API client:
+
+```javascript title="utils/apiClient.js"
+import { getAccessToken } from './tokenStorage';
+
+export async function fetchWithAuth(url, options = {}) {
+  const accessToken = await getAccessToken();
+
+  if (!accessToken) {
+    throw new Error('Not authenticated');
+  }
+
+  const headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  if (response.status === 401) {
+    // Token expired, try to refresh
+    try {
+      const newToken = await refreshAuthToken();
+      // Retry request with new token
+      headers['Authorization'] = `Bearer ${newToken}`;
+      return fetch(url, { ...options, headers });
+    } catch (error) {
+      // Refresh failed, redirect to login
+      throw new Error('Session expired');
+    }
+  }
+
+  return response;
+}
+```
+
+### Usage Example
+
+```javascript
+import { fetchWithAuth } from './utils/apiClient';
+
+async function getUserProfile() {
+  try {
+    const response = await fetchWithAuth('https://api.yourapp.com/profile');
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch profile:', error);
+    throw error;
+  }
+}
+```
+
+## Authentication Context
+
+Create a context provider for app-wide auth state:
+
+```javascript title="contexts/AuthContext.js"
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import { scalekit } from '../utils/scalekit';
+import { getAccessToken, storeTokens, clearTokens } from '../utils/tokenStorage';
+
+const AuthContext = createContext({});
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        const isValid = await scalekit.validateAccessToken(token);
+        if (isValid) {
+          // Decode token to get user info
+          const decoded = decodeJWT(token);
+          setUser(decoded);
+        } else {
+          await clearTokens();
+        }
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (options) => {
+    const result = await scalekit.login(options);
+    if (result.type === 'success') {
+      await storeTokens(result.accessToken, result.refreshToken);
+      setUser(result.user);
+    }
+    return result;
+  };
+
+  const logout = async () => {
+    await clearTokens();
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () => useContext(AuthContext);
+```
+
+### Use in Components
+
+```javascript title="App.js"
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NavigationContainer } from '@react-navigation/native';
+
+function AppContent() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  return (
+    <NavigationContainer>
+      {user ? <AuthenticatedStack /> : <LoginStack />}
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
+```
+
+## Error Handling
+
+Handle authentication errors:
+
+```javascript
+try {
+  const result = await scalekit.login(options);
+
+  if (result.type === 'error') {
+    if (result.error === 'user_cancelled') {
+      console.log('User cancelled authentication');
+    } else if (result.error === 'network_error') {
+      Alert.alert('Network Error', 'Please check your connection');
+    } else {
+      Alert.alert('Error', 'Authentication failed');
+    }
+  }
+} catch (error) {
+  console.error('Login error:', error);
+  Alert.alert('Error', error.message);
+}
+```
+
+## Platform-Specific Configuration
+
+### iOS Configuration
+
+Add URL scheme in `Info.plist` (handled automatically by Expo):
+
+```xml
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>myapp</string>
+    </array>
+  </dict>
+</array>
+```
+
+### Android Configuration
+
+Add intent filter in `AndroidManifest.xml` (handled automatically by Expo):
+
+```xml
+<intent-filter>
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+  <data android:scheme="myapp" />
+</intent-filter>
+```
+
+## Testing
+
+### Test in Development
+
+```bash
+# iOS Simulator
+npx expo start --ios
+
+# Android Emulator
+npx expo start --android
+
+# Physical device
+npx expo start
+# Scan QR code with Expo Go app
+```
+
+### Production Build
+
+```bash
+# Build for iOS
+eas build --platform ios
+
+# Build for Android
+eas build --platform android
+```
+
+## Resources
+
+- [Expo Auth Session Documentation](https://docs.expo.dev/versions/latest/sdk/auth-session/)
+- [Expo Secure Store Documentation](https://docs.expo.dev/versions/latest/sdk/securestore/)
+- [Installation Guide](/sdks/installation/)
+- [Configuration Guide](/sdks/configuration/)
+- [Error Handling](/sdks/error-handling/)
+- [Code Examples](/sdks/examples/)

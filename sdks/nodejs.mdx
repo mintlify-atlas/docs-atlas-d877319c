@@ -1,0 +1,361 @@
+---
+title: 'Node.js SDK'
+description: 'Official Node.js SDK for OIDC and SAML integrations with Express, Next.js, and other frameworks'
+sidebar:
+  label: 'Node.js'
+  order: 2
+---
+
+The official Node.js SDK for integrating Scalekit with Node.js applications. It supports OIDC and SAML SSO and includes helpers for common authentication tasks.
+
+## Installation
+
+Install the SDK using npm or yarn:
+
+```bash
+npm install @scalekit-sdk/node
+```
+
+or with yarn:
+
+```bash
+yarn add @scalekit-sdk/node
+```
+
+## Quick Start
+
+Initialize the Scalekit client with your environment credentials:
+
+```javascript title="utils/auth.js"
+import { Scalekit } from '@scalekit-sdk/node';
+
+export const scalekit = new Scalekit(
+  process.env.SCALEKIT_ENVIRONMENT_URL,
+  process.env.SCALEKIT_CLIENT_ID,
+  process.env.SCALEKIT_CLIENT_SECRET
+);
+```
+
+**Security:** Never hard-code credentials. Always use environment variables to store sensitive configuration.
+
+## Core Methods
+
+### Generate Authorization URL
+
+Create an authorization URL to redirect users to Scalekit for authentication:
+
+```javascript title="Login route"
+const redirectUri = 'https://yourapp.com/auth/callback';
+const options = {
+  scopes: ['openid', 'profile', 'email', 'offline_access'],
+  state: generateSecureRandomState(), // For CSRF protection
+};
+
+const url = scalekit.getAuthorizationUrl(redirectUri, options);
+res.redirect(url);
+```
+
+### Exchange Authorization Code
+
+Exchange the authorization code for user tokens after the callback:
+
+```javascript title="Callback handler" {7-10}
+app.get('/auth/callback', async (req, res) => {
+  const { code, error } = req.query;
+
+  if (error) {
+    return res.redirect('/login?error=auth_failed');
+  }
+
+  try {
+    const authResult = await scalekit.authenticateWithCode(
+      code,
+      'https://yourapp.com/auth/callback'
+    );
+
+    const { user, accessToken, refreshToken, idToken } = authResult;
+
+    // Store tokens securely
+    req.session.user = user;
+    res.redirect('/dashboard');
+  } catch (error) {
+    console.error('Authentication failed:', error);
+    res.redirect('/login?error=exchange_failed');
+  }
+});
+```
+
+### Validate Access Token
+
+Validate access tokens on protected routes:
+
+```javascript title="Middleware"
+async function verifyToken(req, res, next) {
+  const { accessToken } = req.cookies;
+
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    const isValid = await scalekit.validateAccessToken(accessToken);
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Authentication failed' });
+  }
+}
+```
+
+### Refresh Access Token
+
+Refresh expired access tokens using the refresh token:
+
+```javascript title="Token refresh"
+try {
+  const authResult = await scalekit.refreshAccessToken(refreshToken);
+
+  // Update stored tokens
+  const { accessToken, refreshToken: newRefreshToken, expiresIn } = authResult;
+
+  res.cookie('accessToken', accessToken, {
+    maxAge: (expiresIn - 60) * 1000,
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict'
+  });
+} catch (error) {
+  console.error('Token refresh failed:', error);
+  res.redirect('/login');
+}
+```
+
+## Organization Management
+
+### Create Organization
+
+Create a new organization for enterprise customers:
+
+```javascript
+const organization = await scalekit.organization.createOrganization('Acme Corp', {
+  externalId: 'org_12345',
+});
+
+console.log('Organization created:', organization.id);
+```
+
+### Generate Admin Portal Link
+
+Generate a portal link for customers to configure SSO:
+
+```javascript
+const link = await scalekit.organization.generatePortalLink(organizationId);
+
+// Use link.location as iframe src or shareable URL
+res.json({ portalUrl: link.location });
+```
+
+## Session Management
+
+### Get Session Details
+
+Retrieve details for a specific session:
+
+```javascript
+const sessionDetails = await scalekit.session.getSession('ses_1234567890123456');
+console.log('Session:', sessionDetails);
+```
+
+### List User Sessions
+
+List all active sessions for a user:
+
+```javascript
+const userSessions = await scalekit.session.getUserSessions('usr_1234567890123456', {
+  pageSize: 10,
+  filter: {
+    status: ['ACTIVE'],
+  }
+});
+```
+
+### Revoke Session
+
+Revoke a specific session (logout from one device):
+
+```javascript
+const revokedSession = await scalekit.session.revokeSession('ses_1234567890123456');
+console.log('Session revoked');
+```
+
+### Revoke All User Sessions
+
+Revoke all sessions for a user (logout from all devices):
+
+```javascript
+await scalekit.session.revokeAllUserSessions('usr_1234567890123456');
+console.log('All sessions revoked');
+```
+
+## Advanced Features
+
+### Custom Authorization Options
+
+Customize the authorization flow with additional options:
+
+```javascript
+const options = {
+  scopes: ['openid', 'profile', 'email', 'offline_access'],
+  organizationId: 'org_123',        // Route to specific organization
+  connectionId: 'conn_456',         // Route to specific connection
+  loginHint: 'user@example.com',    // Pre-fill email
+  prompt: 'login',                  // Force re-authentication
+  state: generateState(),           // CSRF protection
+};
+
+const url = scalekit.getAuthorizationUrl(redirectUri, options);
+```
+
+### Error Handling
+
+The SDK throws errors that should be caught and handled:
+
+```javascript
+try {
+  const result = await scalekit.authenticateWithCode(code, redirectUri);
+} catch (error) {
+  if (error.code === 'invalid_grant') {
+    // Authorization code expired or already used
+    return res.redirect('/login?error=code_expired');
+  }
+
+  if (error.code === 'invalid_client') {
+    // Invalid credentials
+    console.error('SDK configuration error');
+  }
+
+  // Handle other errors
+  console.error('Authentication error:', error.message);
+}
+```
+
+## TypeScript Support
+
+The SDK includes TypeScript definitions:
+
+```typescript
+import { Scalekit, AuthorizationUrlOptions, AuthenticationResponse } from '@scalekit-sdk/node';
+
+const scalekit: Scalekit = new Scalekit(
+  process.env.SCALEKIT_ENVIRONMENT_URL!,
+  process.env.SCALEKIT_CLIENT_ID!,
+  process.env.SCALEKIT_CLIENT_SECRET!
+);
+
+const options: AuthorizationUrlOptions = {
+  scopes: ['openid', 'profile', 'email'],
+};
+
+const authResult: AuthenticationResponse = await scalekit.authenticateWithCode(
+  code,
+  redirectUri
+);
+```
+
+## Framework Examples
+
+### Express.js
+
+Complete Express.js integration example:
+
+```javascript title="app.js"
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
+import { Scalekit } from '@scalekit-sdk/node';
+
+const app = express();
+app.use(cookieParser());
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+}));
+
+const scalekit = new Scalekit(
+  process.env.SCALEKIT_ENVIRONMENT_URL,
+  process.env.SCALEKIT_CLIENT_ID,
+  process.env.SCALEKIT_CLIENT_SECRET
+);
+
+// Login route
+app.get('/login', (req, res) => {
+  const state = generateState();
+  req.session.oauthState = state;
+
+  const url = scalekit.getAuthorizationUrl(
+    'https://yourapp.com/auth/callback',
+    { scopes: ['openid', 'profile', 'email'], state }
+  );
+
+  res.redirect(url);
+});
+
+// Callback route
+app.get('/auth/callback', async (req, res) => {
+  const { code, state } = req.query;
+
+  if (state !== req.session.oauthState) {
+    return res.status(400).send('Invalid state');
+  }
+
+  const authResult = await scalekit.authenticateWithCode(
+    code,
+    'https://yourapp.com/auth/callback'
+  );
+
+  req.session.user = authResult.user;
+  res.redirect('/dashboard');
+});
+```
+
+### Next.js
+
+Next.js API route example:
+
+```javascript title="pages/api/auth/callback.js"
+import { scalekit } from '@/lib/scalekit';
+
+export default async function handler(req, res) {
+  const { code } = req.query;
+
+  try {
+    const authResult = await scalekit.authenticateWithCode(
+      code,
+      `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback`
+    );
+
+    // Set secure cookie
+    res.setHeader('Set-Cookie', [
+      `accessToken=${authResult.accessToken}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${authResult.expiresIn}`,
+    ]);
+
+    res.redirect('/dashboard');
+  } catch (error) {
+    res.status(401).json({ error: 'Authentication failed' });
+  }
+}
+```
+
+## Resources
+
+- [GitHub Repository](https://github.com/scalekit-inc/scalekit-sdk-node)
+- [npm Package](https://www.npmjs.com/package/@scalekit-sdk/node)
+- [Installation Guide](/sdks/installation/)
+- [Configuration Guide](/sdks/configuration/)
+- [Error Handling](/sdks/error-handling/)
+- [Code Examples](/sdks/examples/)

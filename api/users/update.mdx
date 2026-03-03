@@ -1,0 +1,284 @@
+---
+title: 'Update user'
+description: 'Modify user account information including profile details and metadata'
+---
+
+## PATCH /api/v1/users/{id}
+
+Modifies user account information including profile details, metadata, and external ID. Use this endpoint to update a user's personal information, contact details, or custom metadata.
+
+## Request
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  System-generated user ID. Must start with 'usr_' and be 19-25 characters long.
+  
+  ```
+  usr_123
+  ```
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="external_id" type="string">
+  Your application's unique identifier for this user.
+  
+  ```
+  ext_12345a67b89c
+  ```
+</ParamField>
+
+### Body Parameters
+
+<ParamField body="user_profile" type="object">
+  User's personal information to update.
+  
+  <Expandable title="user_profile fields">
+    <ParamField body="user_profile.given_name" type="string">
+      User's first name. Maximum 255 characters.
+    </ParamField>
+
+    <ParamField body="user_profile.family_name" type="string">
+      User's last name. Maximum 255 characters.
+    </ParamField>
+
+    <ParamField body="user_profile.name" type="string">
+      Full display name.
+    </ParamField>
+
+    <ParamField body="user_profile.phone_number" type="string">
+      Phone number in E.164 international format.
+      
+      ```
+      +14155552671
+      ```
+    </ParamField>
+
+    <ParamField body="user_profile.locale" type="string">
+      User's preferred language and region (BCP-47 format).
+      
+      ```
+      en-US
+      ```
+    </ParamField>
+
+    <ParamField body="user_profile.picture" type="string">
+      URL to the user's profile picture.
+    </ParamField>
+
+    <ParamField body="user_profile.custom_attributes" type="object">
+      Custom attributes for extended user profile data. Keys must be 3-25 characters, values must be 1-256 characters.
+      
+      ```json
+      {
+        "department": "engineering",
+        "security_clearance": "level2"
+      }
+      ```
+    </ParamField>
+
+    <ParamField body="user_profile.metadata" type="object">
+      System-managed key-value pairs for internal tracking.
+      
+      ```json
+      {
+        "account_status": "active",
+        "signup_source": "mobile_app"
+      }
+      ```
+    </ParamField>
+
+    <ParamField body="user_profile.groups" type="array">
+      List of group names the user belongs to. Each group name must be 1-250 characters.
+      
+      ```json
+      ["engineering", "managers"]
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Custom key-value pairs for storing additional user context.
+  
+  ```json
+  {
+    "department": "sales",
+    "location": "nyc-office"
+  }
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="user" type="object">
+  The modified user object with updated timestamps.
+
+  <Expandable title="user object">
+    <ResponseField name="id" type="string">
+      Unique system-generated identifier
+    </ResponseField>
+
+    <ResponseField name="email" type="string">
+      Primary email address (immutable)
+    </ResponseField>
+
+    <ResponseField name="external_id" type="string">
+      Your application's unique identifier
+    </ResponseField>
+
+    <ResponseField name="user_profile" type="object">
+      Updated user's personal information
+    </ResponseField>
+
+    <ResponseField name="memberships" type="array">
+      List of organization memberships
+    </ResponseField>
+
+    <ResponseField name="metadata" type="object">
+      Updated custom key-value pairs
+    </ResponseField>
+
+    <ResponseField name="create_time" type="string">
+      Timestamp when created (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="update_time" type="string">
+      Updated timestamp of last modification (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="last_login_time" type="string">
+      Timestamp of most recent authentication (ISO 8601)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+await scalekit.user.updateUser("usr_123", {
+    userProfile: {
+        firstName: "John",
+        lastName: "Smith",
+    },
+    metadata: {
+        department: "sales",
+    },
+});
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+import os
+from scalekit import ScalekitClient
+from scalekit.v1.users.users_pb2 import UpdateUser
+from scalekit.v1.commons.commons_pb2 import UserProfile
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENV_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+update_user = UpdateUser(
+    user_profile=UserProfile(
+        first_name="John",
+        last_name="Smith"
+    ),
+    metadata={"department": "sales"}
+)
+
+scalekit_client.users.update_user(
+    organization_id="org_123", 
+    user=update_user
+)
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENV_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+upd := &usersv1.UpdateUser{
+    UserProfile: &usersv1.UpdateUserProfile{
+        FirstName: "John",
+        LastName:  "Smith",
+    },
+    Metadata: map[string]string{
+        "department": "sales",
+    },
+}
+
+scalekitClient.User().UpdateUser(ctx, "usr_123", upd)
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+import com.scalekit.grpc.scalekit.v1.users.*;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENV_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+UpdateUser upd = UpdateUser.newBuilder()
+    .setUserProfile(
+        UpdateUserProfile.newBuilder()
+            .setFirstName("John")
+            .setLastName("Smith")
+            .build())
+    .putMetadata("department", "sales")
+    .build();
+
+UpdateUserRequest updReq = UpdateUserRequest.newBuilder()
+    .setUser(upd)
+    .build();
+
+scalekitClient.users().updateUser("usr_123", updReq);
+```
+  </TabItem>
+
+  <TabItem label="cURL">
+```bash
+curl -X PATCH 'https://<SCALEKIT_ENV_URL>/api/v1/users/usr_123' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_profile": {
+      "given_name": "John",
+      "family_name": "Smith"
+    },
+    "metadata": {
+      "department": "sales"
+    }
+  }'
+```
+  </TabItem>
+</Tabs>
+
+## Error Responses
+
+<ResponseField name="200" type="success">
+  User updated successfully
+</ResponseField>
+
+<ResponseField name="404" type="error">
+  User not found
+</ResponseField>
+
+## Notes
+
+- Fields like user ID, email address, environment ID, and creation time cannot be modified
+- Only specified fields will be updated; other fields remain unchanged
+- The `update_time` field is automatically updated by the server

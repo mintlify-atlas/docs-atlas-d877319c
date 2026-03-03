@@ -1,0 +1,91 @@
+---
+title: Session policies
+description: Configure session timeouts and security settings
+---
+
+Session policies control how long users stay authenticated and when re-authentication is required.
+
+## Policy types
+
+### Absolute session timeout
+
+Maximum session duration regardless of activity.
+
+**Configuration**:
+- Default: 30 days
+- Range: 5 minutes to 1 year
+- Use case: Enforce periodic re-authentication
+
+**When to use**:
+- High security applications
+- Compliance requirements
+- Shared device scenarios
+
+### Idle session timeout
+
+Inactivity period before session expires.
+
+**Configuration**:
+- Default: Disabled
+- Range: 5 minutes to 30 days
+- Use case: Auto-logout inactive users
+
+**When to use**:
+- Shared workstations
+- Public terminals
+- PCI-DSS compliance
+
+### Access token lifetime
+
+Duration before access token must be refreshed.
+
+**Configuration**:
+- Default: 5 minutes
+- Range: 1 minute to 1 hour
+- Use case: Balance security vs. refresh frequency
+
+**When to use**:
+- API-heavy applications
+- Real-time applications
+- Mobile apps
+
+## Configuration
+
+Configure in **Dashboard > Authentication > Session Policy**:
+
+```yaml
+session_policy:
+  absolute_timeout: 30d
+  idle_timeout: 1h
+  access_token_lifetime: 5m
+  refresh_token_rotation: enabled
+```
+
+## Best practices
+
+### Security vs. usability
+
+| Application type | Recommended policy |
+|-----------------|--------------------|
+| Consumer app | 30 days absolute, no idle timeout |
+| Enterprise app | 8 hours absolute, 1 hour idle |
+| Financial app | 15 minutes absolute, 5 minutes idle |
+| Internal tool | 12 hours absolute, 30 minutes idle |
+
+### Multi-device considerations
+
+- Sync session state across devices
+- Revoke all sessions on password change
+- Display active sessions to users
+- Allow per-device logout
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Token management" icon="key" href="/security/token-management">
+    Secure token handling
+  </Card>
+  <Card title="Best practices" icon="shield" href="/security/authentication-best-practices">
+    Authentication security guide
+  </Card>
+</CardGroup>

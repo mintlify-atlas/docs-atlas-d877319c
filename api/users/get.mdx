@@ -1,0 +1,227 @@
+---
+title: 'Get user details'
+description: 'Retrieve details for a specific user by ID'
+---
+
+## GET /api/v1/users/{id}
+
+Retrieves all details for a user by system-generated user ID or external ID. The response includes organization memberships and user metadata.
+
+## Request
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  System-generated user ID. Must start with 'usr_'.
+  
+  ```
+  usr_1234abcd5678efgh
+  ```
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="external_id" type="string">
+  Your application's unique identifier for this user. Use this to retrieve a user by your own ID instead of Scalekit's ID.
+  
+  ```
+  ext_12345a67b89c
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="user" type="object">
+  Full user object with system-generated fields and timestamps.
+
+  <Expandable title="user object">
+    <ResponseField name="id" type="string">
+      Unique system-generated identifier for the user
+      
+      ```
+      usr_1234abcd5678efgh
+      ```
+    </ResponseField>
+
+    <ResponseField name="email" type="string">
+      Primary email address for the user
+      
+      ```
+      user@example.com
+      ```
+    </ResponseField>
+
+    <ResponseField name="external_id" type="string">
+      Your application's unique identifier
+      
+      ```
+      ext_12345a67b89c
+      ```
+    </ResponseField>
+
+    <ResponseField name="user_profile" type="object">
+      User's personal information including name, address, and other profile attributes
+      
+      <Expandable title="user_profile fields">
+        <ResponseField name="given_name" type="string">
+          User's first name
+        </ResponseField>
+
+        <ResponseField name="family_name" type="string">
+          User's last name
+        </ResponseField>
+
+        <ResponseField name="name" type="string">
+          Full display name
+        </ResponseField>
+
+        <ResponseField name="email_verified" type="boolean">
+          Whether the email has been verified
+        </ResponseField>
+
+        <ResponseField name="phone_number" type="string">
+          Phone number in E.164 format
+        </ResponseField>
+
+        <ResponseField name="phone_number_verified" type="boolean">
+          Whether the phone number has been verified
+        </ResponseField>
+
+        <ResponseField name="locale" type="string">
+          User's preferred language (BCP-47 format)
+        </ResponseField>
+
+        <ResponseField name="picture" type="string">
+          URL to profile picture
+        </ResponseField>
+
+        <ResponseField name="custom_attributes" type="object">
+          Custom attributes for extended user data
+        </ResponseField>
+
+        <ResponseField name="metadata" type="object">
+          System-managed metadata
+        </ResponseField>
+
+        <ResponseField name="groups" type="array">
+          List of group names the user belongs to
+        </ResponseField>
+
+        <ResponseField name="external_identities" type="array">
+          List of external identity connections
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+
+    <ResponseField name="memberships" type="array">
+      List of organization memberships with roles and permissions
+    </ResponseField>
+
+    <ResponseField name="metadata" type="object">
+      Custom key-value pairs for storing additional user context
+    </ResponseField>
+
+    <ResponseField name="create_time" type="string">
+      Timestamp when the user account was created (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="update_time" type="string">
+      Timestamp of the last modification (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="last_login_time" type="string">
+      Timestamp of the user's most recent successful authentication (ISO 8601)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+// Get user by Scalekit ID
+const user = await scalekit.user.getUser("usr_123");
+
+// Get user by external ID
+const user = await scalekit.user.getUser("usr_123", { 
+    externalId: "ext_12345a67b89c" 
+});
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+from scalekit import ScalekitClient
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENV_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+# Get user by Scalekit ID
+user = scalekit_client.users.get_user(user_id="usr_123")
+
+# Get user by external ID
+user = scalekit_client.users.get_user(user_id="usr_123", external_id="ext_12345a67b89c")
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENV_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+// Get user by Scalekit ID
+user, err := scalekitClient.User().GetUser(ctx, "usr_123")
+if err != nil {
+    // Handle error
+}
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+import com.scalekit.grpc.scalekit.v1.users.*;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENV_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+// Get user by Scalekit ID
+GetUserResponse userResp = scalekitClient.users().getUser("usr_123");
+User user = userResp.getUser();
+```
+  </TabItem>
+
+  <TabItem label="cURL">
+```bash
+# Get user by Scalekit ID
+curl -X GET 'https://<SCALEKIT_ENV_URL>/api/v1/users/usr_123' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>' \
+  -H 'Accept: application/json'
+
+# Get user by external ID
+curl -X GET 'https://<SCALEKIT_ENV_URL>/api/v1/users/usr_123?external_id=ext_12345a67b89c' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>' \
+  -H 'Accept: application/json'
+```
+  </TabItem>
+</Tabs>
+
+## Error Responses
+
+<ResponseField name="200" type="success">
+  User details retrieved successfully
+</ResponseField>
+
+<ResponseField name="404" type="error">
+  User not found
+</ResponseField>

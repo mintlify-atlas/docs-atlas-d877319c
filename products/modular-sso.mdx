@@ -1,0 +1,460 @@
+---
+title: Modular SSO
+description: Enterprise single sign-on (SAML/OIDC) integration that works with your existing authentication system
+---
+
+Modular SSO enables enterprise single sign-on for applications that maintain their own user database and session management. Scalekit handles SAML and OIDC protocol complexity with customer identity providers while you retain complete control over user data and authentication flows.
+
+## What you get
+
+Modular SSO focuses solely on identity verification:
+
+- **SAML and OIDC support**: Connect with Okta, Azure AD, Google Workspace, and 30+ identity providers
+- **Protocol translation**: Scalekit handles SAML/OIDC complexity, returns normalized user profile
+- **Self-service admin portal**: Customers configure their own SSO connections
+- **Domain-based routing**: Automatic identity provider detection from email domain
+- **IdP-initiated SSO**: Secure handling of identity provider-initiated login flows
+- **User attribute mapping**: Receive standardized user claims regardless of IdP
+
+## When to use Modular SSO
+
+Choose Modular SSO when you:
+
+- Already have user management and session handling
+- Want to add enterprise SSO without replacing existing auth
+- Need to integrate SSO into legacy systems
+- Prefer custom session management logic
+- Want maximum control over user data storage
+
+## Key features
+
+### Identity provider integrations
+
+Connect with enterprise identity providers:
+
+**Popular providers:**
+
+- Okta
+- Microsoft Entra ID (Azure AD)
+- Google Workspace
+- JumpCloud
+- OneLogin
+- Auth0
+- Ping Identity
+
+And 30+ more SAML and OIDC compatible providers.
+
+### Simple authorization flow
+
+Generate authorization URL and redirect users:
+
+```javascript
+// Redirect user to their identity provider
+const authorizationURL = scalekit.getAuthorizationUrl(redirectUri, {
+  organizationId: 'org_123',  // Or use connectionId, loginHint
+});
+
+res.redirect(authorizationURL);
+```
+
+Scalekit handles:
+
+- SAML request generation
+- OIDC authorization flow
+- Protocol-specific parameters
+- Security validations
+
+### Normalized user profiles
+
+Receive consistent user data regardless of IdP:
+
+```javascript
+// Handle callback from identity provider
+const result = await scalekit.authenticateWithCode(code, redirectUri);
+
+const { user, idToken, accessToken } = result;
+
+// Normalized user profile
+console.log(user.email);       // user@company.com
+console.log(user.givenName);   // John
+console.log(user.familyName);  // Doe
+console.log(user.id);          // Unique identifier
+```
+
+Scalekit normalizes:
+
+- Email address
+- First and last name
+- User identifier
+- Custom attributes
+- Group memberships
+
+### Self-service admin portal
+
+Customers configure SSO themselves:
+
+```javascript
+// Generate portal link for customer IT admin
+const portalLink = await scalekit.organization.generatePortalLink('org_123');
+
+// Share this link with customer
+console.log('Admin Portal:', portalLink.location);
+```
+
+Customers can:
+
+- Upload SAML metadata or configure OIDC
+- Test SSO connections
+- Configure attribute mappings
+- Manage domains
+- Download service provider metadata
+
+### Domain-based routing
+
+Automatic identity provider detection:
+
+```javascript
+// Extract domain from user email
+const domain = email.split('@')[1]; // "megacorp.org"
+
+// Check if domain has SSO configured
+const connections = await scalekit.connections.listConnectionsByDomain({ domain });
+
+if (connections.length > 0) {
+  // Redirect to SSO
+  const authUrl = scalekit.getAuthorizationUrl(redirectUri, {
+    domainHint: domain
+  });
+  return res.redirect(authUrl);
+} else {
+  // Show alternative login
+  return showPasswordLogin();
+}
+```
+
+### IdP-initiated SSO handling
+
+Secure handling of identity provider-initiated login:
+
+```javascript
+// Handle IdP-initiated login at your initiate-login URL
+const { idp_initiated_login } = req.query;
+
+if (idp_initiated_login) {
+  // Decode JWT to get connection details
+  const claims = await scalekit.getIdpInitiatedLoginClaims(idp_initiated_login);
+  
+  // Generate authorization URL and complete flow
+  const authUrl = scalekit.getAuthorizationUrl(redirectUri, {
+    connectionId: claims.connection_id,
+    organizationId: claims.organization_id,
+    state: claims.relay_state
+  });
+  
+  return res.redirect(authUrl);
+}
+```
+
+Converts risky IdP-initiated flows to secure SP-initiated flows.
+
+## Integration with existing auth systems
+
+Modular SSO integrates with popular authentication providers:
+
+### Auth0
+
+Add enterprise SSO to Auth0:
+
+- Configure Scalekit as custom social connection
+- Map Scalekit user attributes to Auth0 profile
+- Preserve existing Auth0 rules and actions
+
+[Auth0 integration guide](/guides/integrations/auth-systems/auth0/)
+
+### Firebase Authentication
+
+Add enterprise SSO to Firebase:
+
+- Use Scalekit as custom OAuth provider
+- Create Firebase custom tokens from Scalekit users
+- Maintain Firebase security rules
+
+[Firebase integration guide](/guides/integrations/auth-systems/firebase/)
+
+### AWS Cognito
+
+Add enterprise SSO to Cognito:
+
+- Configure Scalekit as OIDC provider
+- Map user attributes to Cognito user pool
+- Preserve Cognito user lifecycle
+
+[AWS Cognito integration guide](/guides/integrations/auth-systems/aws-cognito/)
+
+## How it works
+
+### Authentication sequence
+
+1. **User initiates login**: Your app determines user needs SSO
+2. **Generate authorization URL**: Include organization or domain identifier
+3. **Redirect to IdP**: Scalekit routes to correct identity provider
+4. **User authenticates**: Via customer's identity provider (Okta, Azure AD, etc.)
+5. **Callback to your app**: Scalekit returns authorization code
+6. **Exchange code**: Your app gets normalized user profile
+7. **Create session**: Your app creates session and grants access
+
+### Complete implementation
+
+```javascript
+// Step 1: Redirect to SSO
+app.get('/login/sso', (req, res) => {
+  const authUrl = scalekit.getAuthorizationUrl('https://yourapp.com/auth/callback', {
+    organizationId: req.query.org
+  });
+  res.redirect(authUrl);
+});
+
+// Step 2: Handle callback
+app.get('/auth/callback', async (req, res) => {
+  const { code, error } = req.query;
+  
+  if (error) {
+    return res.status(401).json({ error });
+  }
+  
+  // Exchange code for user profile
+  const result = await scalekit.authenticateWithCode(
+    code,
+    'https://yourapp.com/auth/callback'
+  );
+  
+  // Your user management logic
+  const user = await findOrCreateUser(result.user);
+  const session = await createSession(user);
+  
+  res.redirect('/dashboard');
+});
+```
+
+## Customer onboarding
+
+### Create organization
+
+Create organization for each enterprise customer:
+
+```javascript
+const org = await scalekit.organization.create({
+  display_name: 'ACME Corporation',
+  external_id: 'customer_123'
+});
+```
+
+### Provide admin portal access
+
+Two options for SSO configuration:
+
+**Option 1: Shareable link**
+
+```javascript
+// Generate one-time portal link
+const link = await scalekit.organization.generatePortalLink(org.id);
+
+// Share via email or in-app
+sendEmail(customerAdmin, {
+  subject: 'Configure SSO for your team',
+  portalUrl: link.location
+});
+```
+
+**Option 2: Embedded portal**
+
+```html
+<!-- Embed portal in your app -->
+<iframe
+  src="<%= portalLink.location %>"
+  width="100%"
+  height="600"
+  frameborder="0"
+  allow="clipboard-write">
+</iframe>
+```
+
+### Enable domain verification
+
+Customers verify domain ownership:
+
+1. Customer adds DNS TXT record
+2. Scalekit verifies ownership
+3. Users with verified domain auto-route to SSO
+4. No organization selection needed
+
+## Advanced features
+
+### Multiple SSO connections
+
+Support multiple identity providers per organization:
+
+```javascript
+// List all connections for organization
+const connections = await scalekit.connections.listByOrganization({
+  organizationId: 'org_123'
+});
+
+// Each division can have own IdP
+connections.forEach(conn => {
+  console.log(conn.provider);  // okta, azure, google
+});
+```
+
+### Custom attribute mapping
+
+Map custom IdP attributes:
+
+```javascript
+// IdP sends custom attributes
+const result = await scalekit.authenticateWithCode(code, redirectUri);
+
+// Access custom claims
+const customAttrs = result.idToken.custom_attributes;
+console.log(customAttrs.employee_id);
+console.log(customAttrs.department);
+console.log(customAttrs.cost_center);
+```
+
+### Pre-check SSO availability
+
+Check before redirecting:
+
+```javascript
+// Check if domain has SSO
+const hasSso = await checkSsoAvailability(email);
+
+if (hasSso) {
+  // Show "Sign in with SSO" button
+} else {
+  // Show username/password form
+}
+
+async function checkSsoAvailability(email) {
+  const domain = email.split('@')[1];
+  const connections = await scalekit.connections.listConnectionsByDomain({ domain });
+  return connections.length > 0;
+}
+```
+
+### Organization auto-creation
+
+Just-in-time organization provisioning:
+
+```javascript
+// Automatically create organization on first SSO login
+const result = await scalekit.authenticateWithCode(code, redirectUri);
+
+const orgId = result.idToken.oid;
+const orgName = result.idToken.org_name;
+
+// Create organization in your system
+const org = await createOrganization({
+  scalekitId: orgId,
+  name: orgName
+});
+```
+
+## Testing SSO
+
+Test SSO without customer IdP:
+
+### IdP Simulator
+
+Built-in test identity provider:
+
+1. Create test organization in dashboard
+2. Pre-configured with example.com and example.org domains
+3. Use test organization ID in authorization URL
+4. IdP Simulator appears for authentication
+5. Enter any email and name to simulate SSO
+
+[Complete testing guide](/sso/guides/test-sso/)
+
+### Test with real IdPs
+
+Create free developer accounts:
+
+- **Okta**: Free developer account
+- **Azure AD**: Microsoft 365 Developer Program
+- **Google Workspace**: Google Workspace trial
+
+## Security features
+
+### Protocol security
+
+- **SAML assertion validation**: Signature and timestamp verification
+- **OIDC state parameter**: CSRF protection
+- **Redirect URI validation**: Prevent open redirect attacks
+- **Certificate rotation**: Automatic handling of IdP certificate updates
+
+### Token security
+
+- **Short-lived tokens**: Configurable access token lifetime
+- **Token validation**: JWT signature verification via JWKS
+- **Audience validation**: Ensures tokens for your application
+- **Issuer validation**: Confirms tokens from Scalekit
+
+### Audit and compliance
+
+- **Authentication logs**: Complete SSO event history
+- **User access tracking**: Monitor authentication events
+- **Organization events**: Track SSO configuration changes
+- **Webhook notifications**: Real-time event streaming
+
+## Benefits
+
+### Developer experience
+
+- **Minimal integration**: Add SSO without replacing auth system
+- **Simple API**: Single SDK method for SSO flows
+- **Self-service**: Customers configure their own SSO
+- **No IdP expertise**: Scalekit handles SAML/OIDC complexity
+
+### Customer experience
+
+- **Familiar login**: Users authenticate via corporate identity
+- **Single sign-on**: One login for all applications
+- **IT control**: Centralized access management
+- **Quick onboarding**: Self-service configuration
+
+### Production ready
+
+- **Enterprise security**: SOC 2, ISO 27001 certified
+- **High availability**: 99.99% uptime SLA
+- **Global performance**: Multi-region deployment
+- **Scalable**: Handles any volume
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Quickstart guide" icon="rocket" href="/sso/quickstart">
+    Add enterprise SSO in 30 minutes
+  </Card>
+  
+  <Card title="SSO basics" icon="book" href="/sso/guides/sso-basics">
+    Learn how SAML and OIDC work
+  </Card>
+  
+  <Card title="Test SSO" icon="flask" href="/sso/guides/test-sso">
+    Test your SSO integration
+  </Card>
+  
+  <Card title="Admin portal" icon="cog" href="/guides/admin-portal">
+    Configure self-service portal
+  </Card>
+</CardGroup>
+
+## Related products
+
+- **[Full-stack Auth](/products/full-stack-auth)**: Includes SSO plus complete user management
+- **[SCIM Provisioning](/products/modular-scim)**: Add automated user provisioning
+
+<Note>
+  Modular SSO is designed for applications with existing user management. If you're building new authentication, consider [Full-stack Auth](/products/full-stack-auth) which includes SSO plus complete user lifecycle management.
+</Note>

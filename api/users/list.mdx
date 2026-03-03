@@ -1,0 +1,222 @@
+---
+title: 'List users'
+description: 'Retrieve a paginated list of users in an organization or environment'
+---
+
+## GET /api/v1/organizations/{organization_id}/users
+
+Retrieves a paginated list of all users who are members of the specified organization. Use this endpoint to view all users with access to a particular organization, including their roles, metadata, and membership details.
+
+## Request
+
+### Path Parameters
+
+<ParamField path="organization_id" type="string" required>
+  Unique identifier of the organization. Must start with 'org_' and be 1-32 characters long.
+  
+  ```
+  org_123
+  ```
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="page_size" type="integer">
+  Maximum number of users to return in a single response. Valid range: 1-100.
+  
+  ```
+  50
+  ```
+</ParamField>
+
+<ParamField query="page_token" type="string">
+  Pagination token from a previous response. Leave empty for the first request.
+  
+  ```
+  eyJwYWdlIjogMiwgImxhc3RfaWQiOiAidXNyXzEyMzQ1In0=
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="users" type="array">
+  List of user objects for the current page.
+
+  <Expandable title="user object">
+    <ResponseField name="id" type="string">
+      Unique system-generated identifier for the user
+      
+      ```
+      usr_1234abcd5678efgh
+      ```
+    </ResponseField>
+
+    <ResponseField name="email" type="string">
+      Primary email address for the user
+    </ResponseField>
+
+    <ResponseField name="external_id" type="string">
+      Your application's unique identifier
+    </ResponseField>
+
+    <ResponseField name="user_profile" type="object">
+      User's personal information
+    </ResponseField>
+
+    <ResponseField name="memberships" type="array">
+      List of organization memberships
+    </ResponseField>
+
+    <ResponseField name="metadata" type="object">
+      Custom key-value pairs
+    </ResponseField>
+
+    <ResponseField name="create_time" type="string">
+      Timestamp when created (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="update_time" type="string">
+      Timestamp of last modification (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="last_login_time" type="string">
+      Timestamp of most recent authentication (ISO 8601)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="next_page_token" type="string">
+  Opaque token for retrieving the next page of results. Empty if there are no more pages.
+  
+  ```
+  eyJwYWdlIjogMiwgImxhc3RfaWQiOiAidXNyXzEyMzQ1In0=
+  ```
+</ResponseField>
+
+<ResponseField name="prev_page_token" type="string">
+  Opaque token for retrieving the previous page of results. Empty for the first page.
+  
+  ```
+  eyJwYWdlIjogMCwgImZpcnN0X2lkIjogInVzcl85ODc2NSJ9
+  ```
+</ResponseField>
+
+<ResponseField name="total_size" type="integer">
+  Total number of users matching the request criteria, regardless of pagination.
+  
+  ```
+  1042
+  ```
+</ResponseField>
+
+## Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+const response = await scalekit.user.listOrganizationUsers("org_123", {
+    pageSize: 50,
+});
+console.log(response.users);
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+from scalekit import ScalekitClient
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENV_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+resp, _ = scalekit_client.users.list_users(organization_id="org_123", page_size=50)
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENV_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+list, err := scalekitClient.User().ListOrganizationUsers(ctx, "org_123", &scalekit.ListUsersOptions{
+    PageSize: 50,
+})
+if err != nil {
+    // Handle error
+}
+fmt.Println(list.Users)
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+import com.scalekit.grpc.scalekit.v1.users.*;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENV_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+ListOrganizationUsersRequest listReq = ListOrganizationUsersRequest.newBuilder()
+    .setPageSize(50)
+    .build();
+
+ListOrganizationUsersResponse list = scalekitClient.users().listOrganizationUsers("org_123", listReq);
+```
+  </TabItem>
+
+  <TabItem label="cURL">
+```bash
+curl -X GET 'https://<SCALEKIT_ENV_URL>/api/v1/organizations/org_123/users?page_size=50' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>' \
+  -H 'Accept: application/json'
+```
+  </TabItem>
+</Tabs>
+
+## List All Users in Environment
+
+### GET /api/v1/users
+
+Retrieves a paginated list of all users across your entire environment, regardless of organization membership.
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+const response = await scalekit.user.listUsers({ pageSize: 100 });
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+# Pass empty org to fetch all users in environment
+resp, _ = scalekit_client.users.list_users(organization_id="", page_size=100)
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+all, err := scalekitClient.User().ListOrganizationUsers(ctx, "", &scalekit.ListUsersOptions{PageSize: 100})
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+ListUsersRequest lur = ListUsersRequest.newBuilder().setPageSize(100).build();
+ListUsersResponse allUsers = scalekitClient.users().listUsers(lur);
+```
+  </TabItem>
+</Tabs>
+
+## Error Responses
+
+<ResponseField name="200" type="success">
+  Successfully retrieved the list of users in the organization
+</ResponseField>

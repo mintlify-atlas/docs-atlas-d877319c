@@ -1,0 +1,170 @@
+---
+title: 'Create organization'
+description: 'Create a new organization in your environment'
+---
+
+## POST /api/v1/organizations
+
+Creates a new organization in your environment. Use this endpoint to add a new tenant that can be configured with various settings and metadata.
+
+## Request
+
+### Body Parameters
+
+<ParamField body="display_name" type="string" required>
+  Name of the organization. Must be between 1 and 200 characters.
+  
+  ```
+  Megasoft Inc
+  ```
+</ParamField>
+
+<ParamField body="external_id" type="string">
+  Your application's unique identifier for this organization, used to link Scalekit with your system.
+  
+  ```
+  my_unique_id
+  ```
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Key-value pairs for storing additional organization information.
+  
+  ```json
+  {
+    "industry": "technology",
+    "plan": "enterprise"
+  }
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="organization" type="object">
+  The newly created organization with its unique identifier and settings.
+
+  <Expandable title="organization object">
+    <ResponseField name="id" type="string">
+      Unique scalekit-generated identifier
+      
+      ```
+      org_59615193906282635
+      ```
+    </ResponseField>
+
+    <ResponseField name="display_name" type="string">
+      Name of the organization
+    </ResponseField>
+
+    <ResponseField name="external_id" type="string">
+      Your application's unique identifier for this organization
+    </ResponseField>
+
+    <ResponseField name="metadata" type="object">
+      Key-value pairs extension attributes
+    </ResponseField>
+
+    <ResponseField name="region_code" type="string">
+      Geographic region code. Currently limited to US.
+    </ResponseField>
+
+    <ResponseField name="create_time" type="string">
+      Timestamp when the organization was created (ISO 8601)
+      
+      ```
+      2025-02-15T06:23:44.560000Z
+      ```
+    </ResponseField>
+
+    <ResponseField name="update_time" type="string">
+      Timestamp when the organization was last updated (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="settings" type="object">
+      Organization settings including feature toggles
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+const organization = await scalekit.organization.createOrganization('Megasoft Inc', {
+  externalId: 'my_unique_id',
+});
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+from scalekit import ScalekitClient
+from scalekit.v1.organizations import CreateOrganizationOptions
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENV_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+options = CreateOrganizationOptions()
+options.external_id = "my_unique_id"
+
+organization = scalekit_client.organization.create_organization(
+    'Megasoft Inc',
+    options=options
+)
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENV_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+organization, err := scalekitClient.Organization.CreateOrganization(
+    ctx,
+    "Megasoft Inc",
+    scalekit.CreateOrganizationOptions{
+        ExternalID: "my_unique_id",
+    },
+)
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+import com.scalekit.grpc.scalekit.v1.organizations.*;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENV_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+CreateOrganization createOrganization = CreateOrganization.newBuilder()
+    .setDisplayName("Megasoft Inc")
+    .setExternalId("my_unique_id")
+    .build();
+
+Organization createdOrganization = scalekitClient.organizations().create(createOrganization);
+```
+  </TabItem>
+
+  <TabItem label="cURL">
+```bash
+curl -X POST 'https://<SCALEKIT_ENV_URL>/api/v1/organizations' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "display_name": "Megasoft Inc",
+    "external_id": "my_unique_id"
+  }'
+```
+  </TabItem>
+</Tabs>

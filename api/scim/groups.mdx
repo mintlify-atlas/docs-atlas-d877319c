@@ -1,0 +1,72 @@
+---
+title: SCIM groups
+description: SCIM 2.0 group provisioning endpoints
+---
+
+Manage groups via SCIM 2.0 protocol.
+
+## Endpoints
+
+### List groups
+
+```http
+GET /scim/v2/Groups
+```
+
+**Response**:
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+  "totalResults": 1,
+  "Resources": [
+    {
+      "id": "grp_1234567890",
+      "displayName": "Engineering",
+      "members": [
+        {
+          "value": "usr_1234567890",
+          "$ref": "/scim/v2/Users/usr_1234567890"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Create group
+
+```http
+POST /scim/v2/Groups
+```
+
+**Request body**:
+```json
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+  "displayName": "Engineering",
+  "members": []
+}
+```
+
+### Update group
+
+```http
+PATCH /scim/v2/Groups/{groupId}
+```
+
+### Delete group
+
+```http
+DELETE /scim/v2/Groups/{groupId}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SCIM users" icon="user" href="/api/scim/users">
+    User provisioning
+  </Card>
+  <Card title="Directory sync" icon="arrows-rotate" href="/api/scim/directory-sync">
+    Directory synchronization
+  </Card>
+</CardGroup>

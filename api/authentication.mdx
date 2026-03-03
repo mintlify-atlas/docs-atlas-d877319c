@@ -1,0 +1,253 @@
+---
+title: 'API Authentication'
+description: 'Authenticate API requests using OAuth 2.0 Client Credentials'
+---
+
+## Overview
+
+The Scalekit API uses OAuth 2.0 Client Credentials flow for authentication. This flow is designed for server-to-server authentication where your application needs to access the API on its own behalf.
+
+## Obtain API Credentials
+
+Before you can authenticate, you need to obtain your API credentials from the Scalekit Dashboard:
+
+1. Log in to the [Scalekit Dashboard](https://app.scalekit.com)
+2. Navigate to **API Config** section
+3. Copy your credentials:
+   - Environment URL
+   - Client ID
+   - Client Secret
+
+<Warning>
+  **Security**: Never expose your client secret in client-side code or public repositories. Store credentials securely using environment variables.
+</Warning>
+
+## Set Environment Variables
+
+Store your credentials as environment variables:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Bash">
+    ```bash
+    export SCALEKIT_ENVIRONMENT_URL='https://your-org.scalekit.dev'
+    export SCALEKIT_CLIENT_ID='your_client_id'
+    export SCALEKIT_CLIENT_SECRET='your_client_secret'
+    ```
+  </TabItem>
+  <TabItem label=".env file">
+    ```bash
+    SCALEKIT_ENVIRONMENT_URL=https://your-org.scalekit.dev
+    SCALEKIT_CLIENT_ID=your_client_id
+    SCALEKIT_CLIENT_SECRET=your_client_secret
+    ```
+  </TabItem>
+</Tabs>
+
+## Request Access Token
+
+Exchange your client credentials for an access token:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="cURL">
+    ```bash
+    curl -X POST "${SCALEKIT_ENVIRONMENT_URL}/oauth/token" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "client_id=${SCALEKIT_CLIENT_ID}" \
+      -d "client_secret=${SCALEKIT_CLIENT_SECRET}" \
+      -d "grant_type=client_credentials"
+    ```
+  </TabItem>
+  <TabItem label="Node.js">
+    ```javascript
+    import { Scalekit } from '@scalekit-sdk/node'
+
+    // Security: Use environment variables for credentials
+    const scalekit = new Scalekit(
+      process.env.SCALEKIT_ENVIRONMENT_URL,
+      process.env.SCALEKIT_CLIENT_ID,
+      process.env.SCALEKIT_CLIENT_SECRET
+    )
+
+    // The SDK handles token management automatically
+    // You can now make authenticated API calls
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+    from scalekit import ScalekitClient
+
+    # Security: Use environment variables for credentials
+    scalekit_client = ScalekitClient(
+        env_url=os.getenv('SCALEKIT_ENVIRONMENT_URL'),
+        client_id=os.getenv('SCALEKIT_CLIENT_ID'),
+        client_secret=os.getenv('SCALEKIT_CLIENT_SECRET')
+    )
+
+    # The SDK handles token management automatically
+    # You can now make authenticated API calls
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "os"
+        "github.com/scalekit-inc/scalekit-sdk-go"
+    )
+
+    // Security: Use environment variables for credentials
+    scalekitClient := scalekit.NewScalekitClient(
+        os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+        os.Getenv("SCALEKIT_CLIENT_ID"),
+        os.Getenv("SCALEKIT_CLIENT_SECRET"),
+    )
+
+    // The SDK handles token management automatically
+    // You can now make authenticated API calls
+    ```
+  </TabItem>
+  <TabItem label="Java">
+    ```java
+    import com.scalekit.ScalekitClient;
+
+    // Security: Use environment variables for credentials
+    ScalekitClient scalekitClient = new ScalekitClient(
+        System.getenv("SCALEKIT_ENVIRONMENT_URL"),
+        System.getenv("SCALEKIT_CLIENT_ID"),
+        System.getenv("SCALEKIT_CLIENT_SECRET")
+    );
+
+    // The SDK handles token management automatically
+    // You can now make authenticated API calls
+    ```
+  </TabItem>
+</Tabs>
+
+## Token Response
+
+The token endpoint returns an access token that you'll use for subsequent API requests:
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6InNua181Ok4OTEyMjU2NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 86399,
+  "scope": "openid"
+}
+```
+
+<ResponseField name="access_token" type="string" required>
+  The JWT access token to use in API requests. Include this in the Authorization header.
+</ResponseField>
+
+<ResponseField name="token_type" type="string">
+  Always `Bearer` for OAuth 2.0 Client Credentials flow.
+</ResponseField>
+
+<ResponseField name="expires_in" type="integer">
+  Number of seconds until the token expires (typically 86399 seconds / 24 hours).
+</ResponseField>
+
+<ResponseField name="scope" type="string">
+  OAuth scopes granted to this token.
+</ResponseField>
+
+## Make Authenticated Requests
+
+Include the access token in the Authorization header for all API requests:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="cURL">
+    ```bash
+    curl -X GET "${SCALEKIT_ENVIRONMENT_URL}/api/v1/organizations" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+      -H "Accept: application/json"
+    ```
+  </TabItem>
+  <TabItem label="Node.js">
+    ```javascript
+    // SDK handles authentication automatically
+    const organizations = await scalekit.organization.listOrganization({
+      pageSize: 10
+    })
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    # SDK handles authentication automatically
+    from scalekit.v1.organizations.organizations_pb2 import ListOrganizationOptions
+
+    options = ListOrganizationOptions()
+    options.page_size = 10
+
+    organizations = scalekit_client.organization.list_organizations(
+        options=options
+    )
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    // SDK handles authentication automatically
+    organizations, err := scalekitClient.Organization.ListOrganizations(
+        ctx,
+        &scalekit.ListOrganizationOptions{
+            PageSize: 10,
+        },
+    )
+    ```
+  </TabItem>
+  <TabItem label="Java">
+    ```java
+    // SDK handles authentication automatically
+    ListOrganizationsResponse organizations = scalekitClient
+        .organizations()
+        .listOrganizations(10, "");
+    ```
+  </TabItem>
+</Tabs>
+
+## Token Management
+
+### Token Expiration
+
+Access tokens expire after 24 hours (86399 seconds). The Scalekit SDKs automatically handle token refresh, but if you're making raw API calls, you'll need to:
+
+1. Track token expiration using the `expires_in` value
+2. Request a new token before the current one expires
+3. Update your Authorization header with the new token
+
+### Token Security
+
+<Warning>
+  **Critical Security Practices:**
+  - Never hard-code credentials in your source code
+  - Store client secrets in secure environment variables or secret management systems
+  - Never expose tokens in client-side code or public repositories
+  - Rotate credentials regularly
+  - Use HTTPS for all API requests to prevent token interception
+</Warning>
+
+## Authentication Errors
+
+Common authentication errors and solutions:
+
+| Error Code | Error | Solution |
+|-----------|-------|----------|
+| 401 | Token empty | Include the Authorization header with a valid Bearer token |
+| 401 | Invalid credentials | Verify your client_id and client_secret are correct |
+| 401 | Token expired | Request a new access token |
+| 403 | Insufficient permissions | Verify your API credentials have the necessary scopes |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authorization URL" icon="arrow-up-right-from-square" href="/api/auth/authorization-url">
+    Generate authorization URLs for SSO flows
+  </Card>
+  <Card title="Token Exchange" icon="arrows-rotate" href="/api/auth/token-exchange">
+    Exchange authorization codes for user tokens
+  </Card>
+</CardGroup>

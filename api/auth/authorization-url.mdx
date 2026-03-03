@@ -1,0 +1,240 @@
+---
+title: 'Generate Authorization URL'
+description: 'Create authorization URLs for SSO and OAuth flows'
+---
+
+## Overview
+
+The authorization URL endpoint initiates the OAuth 2.0 authorization flow for Single Sign-On (SSO). This endpoint redirects users to their configured Identity Provider (IdP) for authentication.
+
+## Endpoint
+
+<ParamField path="method" type="string" default="GET">
+  GET
+</ParamField>
+
+<ParamField path="url" type="string">
+  `{SCALEKIT_ENVIRONMENT_URL}/oauth/authorize`
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="client_id" type="string" required>
+  Your Scalekit application client ID. Obtain this from the Scalekit Dashboard under API Config.
+</ParamField>
+
+<ParamField query="redirect_uri" type="string" required>
+  The URL where users will be redirected after authentication. Must match one of the redirect URIs configured in your Scalekit application settings.
+</ParamField>
+
+<ParamField query="response_type" type="string" required>
+  OAuth response type. Use `code` for authorization code flow.
+</ParamField>
+
+<ParamField query="scope" type="string" required>
+  Space-separated list of OAuth scopes. Common scopes: `openid`, `email`, `profile`.
+</ParamField>
+
+<ParamField query="organization_id" type="string">
+  Unique identifier of the organization. Use this to initiate SSO for a specific organization. Either `organization_id` or `connection_id` must be provided.
+</ParamField>
+
+<ParamField query="connection_id" type="string">
+  Unique identifier of the SSO connection. Use this to initiate SSO with a specific connection. Either `organization_id` or `connection_id` must be provided.
+</ParamField>
+
+<ParamField query="state" type="string">
+  Optional state parameter for CSRF protection. The value will be returned in the callback.
+</ParamField>
+
+<ParamField query="nonce" type="string">
+  Optional nonce value for replay attack protection in OpenID Connect flows.
+</ParamField>
+
+## Request Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="cURL">
+    ```bash
+    # Authorization with organization_id
+    curl -X GET "${SCALEKIT_ENVIRONMENT_URL}/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=https://yourapp.com/auth/callback&response_type=code&scope=openid%20email%20profile&organization_id=${ORGANIZATION_ID}"
+
+    # Authorization with connection_id
+    curl -X GET "${SCALEKIT_ENVIRONMENT_URL}/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=https://yourapp.com/auth/callback&response_type=code&scope=openid%20email%20profile&connection_id=${CONNECTION_ID}"
+    ```
+  </TabItem>
+  <TabItem label="Node.js">
+    ```javascript
+    import { Scalekit } from '@scalekit-sdk/node'
+
+    const scalekit = new Scalekit(
+      process.env.SCALEKIT_ENVIRONMENT_URL,
+      process.env.SCALEKIT_CLIENT_ID,
+      process.env.SCALEKIT_CLIENT_SECRET
+    )
+
+    // Generate authorization URL with organization_id
+    const authorizationUrl = scalekit.getAuthorizationUrl(
+      'https://yourapp.com/auth/callback',
+      {
+        organizationId: 'org_123456',
+        scopes: ['openid', 'email', 'profile']
+      }
+    )
+
+    // Redirect user to authorizationUrl
+    console.log('Redirect to:', authorizationUrl)
+    ```
+  </TabItem>
+  <TabItem label="Python">
+    ```python
+    import os
+    from scalekit import ScalekitClient
+
+    scalekit_client = ScalekitClient(
+        env_url=os.getenv('SCALEKIT_ENVIRONMENT_URL'),
+        client_id=os.getenv('SCALEKIT_CLIENT_ID'),
+        client_secret=os.getenv('SCALEKIT_CLIENT_SECRET')
+    )
+
+    # Generate authorization URL with organization_id
+    authorization_url = scalekit_client.get_authorization_url(
+        redirect_uri='https://yourapp.com/auth/callback',
+        organization_id='org_123456',
+        scopes=['openid', 'email', 'profile']
+    )
+
+    # Redirect user to authorization_url
+    print(f'Redirect to: {authorization_url}')
+    ```
+  </TabItem>
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+        "fmt"
+        "os"
+        "github.com/scalekit-inc/scalekit-sdk-go"
+    )
+
+    scalekitClient := scalekit.NewScalekitClient(
+        os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+        os.Getenv("SCALEKIT_CLIENT_ID"),
+        os.Getenv("SCALEKIT_CLIENT_SECRET"),
+    )
+
+    // Generate authorization URL with organization_id
+    authorizationUrl := scalekitClient.GetAuthorizationUrl(
+        "https://yourapp.com/auth/callback",
+        &scalekit.AuthorizationUrlOptions{
+            OrganizationId: "org_123456",
+            Scopes: []string{"openid", "email", "profile"},
+        },
+    )
+
+    // Redirect user to authorizationUrl
+    fmt.Printf("Redirect to: %s\n", authorizationUrl)
+    ```
+  </TabItem>
+  <TabItem label="Java">
+    ```java
+    import com.scalekit.ScalekitClient;
+
+    ScalekitClient scalekitClient = new ScalekitClient(
+        System.getenv("SCALEKIT_ENVIRONMENT_URL"),
+        System.getenv("SCALEKIT_CLIENT_ID"),
+        System.getenv("SCALEKIT_CLIENT_SECRET")
+    );
+
+    // Generate authorization URL with organization_id
+    String authorizationUrl = scalekitClient.getAuthorizationUrl(
+        "https://yourapp.com/auth/callback",
+        new AuthorizationUrlOptions()
+            .organizationId("org_123456")
+            .scopes(Arrays.asList("openid", "email", "profile"))
+    );
+
+    // Redirect user to authorizationUrl
+    System.out.println("Redirect to: " + authorizationUrl);
+    ```
+  </TabItem>
+</Tabs>
+
+## Response
+
+The endpoint performs a 302 redirect to the configured Identity Provider's login page. After successful authentication, the IdP redirects back to your `redirect_uri` with an authorization code.
+
+### Callback Parameters
+
+Your redirect URI will receive the following query parameters:
+
+<ResponseField name="code" type="string" required>
+  Authorization code to exchange for tokens. This code is single-use and expires after a short period (typically 10 minutes).
+</ResponseField>
+
+<ResponseField name="state" type="string">
+  The state parameter you provided in the authorization request. Use this to prevent CSRF attacks.
+</ResponseField>
+
+### Callback Example
+
+```
+https://yourapp.com/auth/callback?code=auth_code_123456&state=random_state_value
+```
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error code indicating what went wrong.
+</ResponseField>
+
+<ResponseField name="error_description" type="string">
+  Human-readable description of the error.
+</ResponseField>
+
+### Common Errors
+
+| Error Code | Description | Solution |
+|-----------|-------------|----------|
+| `invalid_request` | Missing or invalid required parameters | Verify all required parameters are included |
+| `unauthorized_client` | Invalid client_id | Check your client_id in Scalekit Dashboard |
+| `invalid_redirect_uri` | Redirect URI not configured | Add the redirect_uri to your application settings |
+| `invalid_scope` | Requested scope is invalid | Use valid OAuth scopes (openid, email, profile) |
+| `organization_not_found` | Organization ID does not exist | Verify the organization_id is correct |
+| `connection_not_found` | Connection ID does not exist | Verify the connection_id is correct |
+
+## Security Considerations
+
+<Warning>
+  **Critical Security Practices:**
+  
+  1. **State Parameter**: Always include a unique `state` parameter to prevent CSRF attacks. Verify the state value when handling the callback.
+  
+  2. **Redirect URI Validation**: Only use redirect URIs that are pre-configured in your Scalekit application. Never accept user-provided redirect URIs.
+  
+  3. **HTTPS Only**: Always use HTTPS for redirect URIs in production. HTTP redirect URIs are insecure and may be rejected.
+  
+  4. **Code Expiration**: Authorization codes expire quickly (typically 10 minutes). Exchange them for tokens immediately.
+  
+  5. **Single Use**: Authorization codes are single-use only. Do not reuse codes.
+</Warning>
+
+## Implementation Flow
+
+1. **Generate Authorization URL**: Create the authorization URL with appropriate parameters
+2. **Redirect User**: Redirect the user's browser to the authorization URL
+3. **User Authenticates**: User logs in through their Identity Provider
+4. **Receive Callback**: Handle the callback with the authorization code
+5. **Exchange Code**: Use the [Token Exchange](/api/auth/token-exchange) endpoint to get user tokens
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Token Exchange" icon="arrows-rotate" href="/api/auth/token-exchange">
+    Exchange authorization codes for access tokens
+  </Card>
+  <Card title="Session Management" icon="clock" href="/api/auth/session-management">
+    Validate and manage user sessions
+  </Card>
+</CardGroup>

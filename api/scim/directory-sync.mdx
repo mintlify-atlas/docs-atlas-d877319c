@@ -1,0 +1,44 @@
+---
+title: Directory sync
+description: Synchronize users and groups from enterprise directories
+---
+
+Synchronize users and groups from enterprise identity providers.
+
+## How it works
+
+1. Customer configures SCIM in their IdP
+2. IdP sends SCIM requests to Scalekit
+3. Scalekit creates/updates/deletes users and groups
+4. Applications receive updated user data
+
+## Configuration
+
+Provide these details to your customer:
+
+- **SCIM base URL**: `https://scalekit.com/scim/v2`
+- **Bearer token**: Generated in dashboard
+- **Supported operations**: Create, Read, Update, Delete users and groups
+
+## Attribute mapping
+
+Standard SCIM attributes are mapped:
+
+| SCIM attribute | Scalekit attribute |
+|----------------|--------------------|
+| userName | email |
+| name.givenName | givenName |
+| name.familyName | familyName |
+| emails[primary] | email |
+| active | active |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SCIM users" icon="user" href="/api/scim/users">
+    User provisioning API
+  </Card>
+  <Card title="SCIM groups" icon="users" href="/api/scim/groups">
+    Group provisioning API
+  </Card>
+</CardGroup>

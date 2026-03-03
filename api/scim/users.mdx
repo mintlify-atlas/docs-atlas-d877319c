@@ -1,0 +1,87 @@
+---
+title: SCIM users
+description: SCIM 2.0 user provisioning endpoints
+---
+
+Manage users via SCIM 2.0 protocol.
+
+## Endpoints
+
+### List users
+
+```http
+GET /scim/v2/Users
+```
+
+**Response**:
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+  "totalResults": 1,
+  "Resources": [
+    {
+      "id": "usr_1234567890",
+      "userName": "john@example.com",
+      "name": {
+        "givenName": "John",
+        "familyName": "Doe"
+      },
+      "emails": [
+        {
+          "value": "john@example.com",
+          "primary": true
+        }
+      ],
+      "active": true
+    }
+  ]
+}
+```
+
+### Create user
+
+```http
+POST /scim/v2/Users
+```
+
+**Request body**:
+```json
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "userName": "john@example.com",
+  "name": {
+    "givenName": "John",
+    "familyName": "Doe"
+  },
+  "emails": [
+    {
+      "value": "john@example.com",
+      "primary": true
+    }
+  ],
+  "active": true
+}
+```
+
+### Update user
+
+```http
+PATCH /scim/v2/Users/{userId}
+```
+
+### Delete user
+
+```http
+DELETE /scim/v2/Users/{userId}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SCIM groups" icon="users" href="/api/scim/groups">
+    Group provisioning
+  </Card>
+  <Card title="Directory sync" icon="arrows-rotate" href="/api/scim/directory-sync">
+    Directory synchronization
+  </Card>
+</CardGroup>

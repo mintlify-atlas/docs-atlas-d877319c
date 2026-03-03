@@ -1,0 +1,614 @@
+---
+title: 'Go SDK'
+description: 'Official Go SDK for OIDC and SAML SSO integration with idiomatic Go patterns and context support'
+sidebar:
+  label: 'Go'
+  order: 4
+---
+
+The official Go SDK for integrating OIDC and SAML SSO with Scalekit. It provides utilities for token validation and secure service endpoints with idiomatic Go patterns.
+
+## Installation
+
+Install the SDK using go get:
+
+```bash
+go get -u github.com/scalekit-inc/scalekit-sdk-go
+```
+
+## Quick Start
+
+Initialize the Scalekit client with your environment credentials:
+
+```go title="utils/auth.go"
+package main
+
+import (
+    "os"
+    "github.com/scalekit-inc/scalekit-sdk-go"
+)
+
+var scalekitClient, err = scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+if err != nil {
+    panic(err)
+}
+```
+
+**Security:** Use environment variables for credentials. Never hard-code secrets in your application.
+
+## Core Methods
+
+### Generate Authorization URL
+
+Create an authorization URL to redirect users:
+
+```go title="Login handler"
+import (
+    "net/http"
+    "github.com/gin-gonic/gin"
+)
+
+func loginHandler(c *gin.Context) {
+    redirectUri := "https://yourapp.com/auth/callback"
+    options := scalekit.AuthorizationUrlOptions{
+        Scopes: []string{"openid", "profile", "email", "offline_access"},
+        State:  generateSecureState(), // For CSRF protection
+    }
+
+    url, err := scalekitClient.GetAuthorizationUrl(redirectUri, options)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate URL"})
+        return
+    }
+
+    c.Redirect(http.StatusFound, url.String())
+}
+```
+
+### Exchange Authorization Code
+
+Exchange the authorization code for tokens:
+
+```go title="Callback handler"
+func authCallbackHandler(c *gin.Context) {
+    code := c.Query("code")
+    errorParam := c.Query("error")
+
+    if errorParam != "" {
+        c.Redirect(http.StatusFound, "/login?error=auth_failed")
+        return
+    }
+
+    if code == "" {
+        c.Redirect(http.StatusFound, "/login?error=missing_code")
+        return
+    }
+
+    // Exchange code for tokens
+    options := scalekit.AuthenticationOptions{}
+    authResult, err := scalekitClient.AuthenticateWithCode(
+        c.Request.Context(),
+        code,
+        "https://yourapp.com/auth/callback",
+        options,
+    )
+
+    if err != nil {
+        log.Printf("Token exchange failed: %v", err)
+        c.Redirect(http.StatusFound, "/login?error=exchange_failed")
+        return
+    }
+
+    user := authResult.User
+    accessToken := authResult.AccessToken
+    refreshToken := authResult.RefreshToken
+
+    // Store tokens securely
+    session := sessions.Default(c)
+    session.Set("user", user)
+    session.Save()
+
+    c.Redirect(http.StatusFound, "/dashboard")
+}
+```
+
+### Validate Access Token
+
+Validate tokens in middleware:
+
+```go title="Auth middleware"
+import (
+    "context"
+    "net/http"
+    "github.com/gin-gonic/gin"
+)
+
+func AuthMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        accessToken, err := c.Cookie("accessToken")
+        if err != nil || accessToken == "" {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+            c.Abort()
+            return
+        }
+
+        // Validate token
+        isValid, err := scalekitClient.ValidateAccessToken(
+            c.Request.Context(),
+            accessToken,
+        )
+
+        if err != nil || !isValid {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+            c.Abort()
+            return
+        }
+
+        c.Next()
+    }
+}
+```
+
+### Refresh Access Token
+
+Refresh expired tokens:
+
+```go title="Token refresh"
+ctx := context.Background()
+refreshToken, _ := c.Cookie("refreshToken")
+
+authResult, err := scalekitClient.RefreshAccessToken(ctx, refreshToken)
+if err != nil {
+    log.Printf("Token refresh failed: %v", err)
+    c.Redirect(http.StatusFound, "/login")
+    return
+}
+
+// Update cookies with new tokens
+c.SetSameSite(http.SameSiteStrictMode)
+c.SetCookie(
+    "accessToken",
+    authResult.AccessToken,
+    authResult.ExpiresIn-60,
+    "/",
+    "",
+    true,  // Secure
+    true,  // HttpOnly
+)
+```
+
+## Organization Management
+
+### Create Organization
+
+Create organizations for enterprise customers:
+
+```go
+import "context"
+
+ctx := context.Background()
+
+organization, err := scalekitClient.Organization.CreateOrganization(
+    ctx,
+    "Acme Corp",
+    scalekit.CreateOrganizationOptions{
+        ExternalID: "org_12345",
+    },
+)
+
+if err != nil {
+    log.Printf("Failed to create organization: %v", err)
+    return
+}
+
+fmt.Printf("Organization created: %s\n", organization.ID)
+```
+
+### Generate Admin Portal Link
+
+Generate portal links for SSO configuration:
+
+```go
+ctx := context.Background()
+
+link, err := scalekitClient.Organization().GeneratePortalLink(
+    ctx,
+    organizationID,
+)
+
+if err != nil {
+    return "", err
+}
+
+// Use link.Location for iframe or shareable URL
+return link.Location, nil
+```
+
+## Session Management
+
+### Get Session Details
+
+Retrieve session information:
+
+```go
+ctx := context.Background()
+
+sessionDetails, err := scalekitClient.Session().GetSession(
+    ctx,
+    "ses_1234567890123456",
+)
+
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Session: %+v\n", sessionDetails)
+```
+
+### List User Sessions
+
+List all sessions for a user:
+
+```go
+import (
+    "time"
+    "context"
+    sessionsv1 "github.com/scalekit-inc/scalekit-sdk-go/pkg/grpc/scalekit/v1/sessions"
+    "google.golang.org/protobuf/types/known/timestamppb"
+)
+
+ctx := context.Background()
+
+startTime, _ := time.Parse(time.RFC3339, "2025-01-01T00:00:00Z")
+endTime, _ := time.Parse(time.RFC3339, "2025-12-31T23:59:59Z")
+
+filter := &sessionsv1.UserSessionFilter{
+    Status:    []string{"ACTIVE"},
+    StartTime: timestamppb.New(startTime),
+    EndTime:   timestamppb.New(endTime),
+}
+
+userSessions, err := scalekitClient.Session().GetUserSessions(
+    ctx,
+    "usr_1234567890123456",
+    10,    // page size
+    "",    // page token
+    filter,
+)
+
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Revoke Session
+
+Revoke specific sessions:
+
+```go
+ctx := context.Background()
+
+revokedSession, err := scalekitClient.Session().RevokeSession(
+    ctx,
+    "ses_1234567890123456",
+)
+
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Session revoked")
+```
+
+### Revoke All User Sessions
+
+Logout from all devices:
+
+```go
+ctx := context.Background()
+
+revokedSessions, err := scalekitClient.Session().RevokeAllUserSessions(
+    ctx,
+    "usr_1234567890123456",
+)
+
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("All sessions revoked")
+```
+
+## Advanced Features
+
+### Custom Authorization Options
+
+Customize authorization with additional parameters:
+
+```go
+options := scalekit.AuthorizationUrlOptions{
+    Scopes:         []string{"openid", "profile", "email", "offline_access"},
+    OrganizationId: "org_123",        // Route to specific organization
+    ConnectionId:   "conn_456",       // Route to specific connection
+    LoginHint:      "user@example.com", // Pre-fill email
+    Prompt:         "login",          // Force re-authentication
+    State:          generateState(),  // CSRF protection
+}
+
+url, _ := scalekitClient.GetAuthorizationUrl(redirectUri, options)
+```
+
+### Error Handling
+
+Handle SDK errors appropriately:
+
+```go
+import "errors"
+
+authResult, err := scalekitClient.AuthenticateWithCode(
+    ctx,
+    code,
+    redirectUri,
+    options,
+)
+
+if err != nil {
+    // Check for specific error types
+    if errors.Is(err, scalekit.ErrInvalidGrant) {
+        // Authorization code expired or already used
+        return c.Redirect(http.StatusFound, "/login?error=code_expired")
+    }
+
+    if errors.Is(err, scalekit.ErrInvalidClient) {
+        // Invalid credentials
+        log.Printf("SDK configuration error: %v", err)
+    }
+
+    // Handle other errors
+    log.Printf("Authentication error: %v", err)
+    return c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication failed"})
+}
+```
+
+### Context-Aware Operations
+
+All SDK methods accept a context for cancellation and timeouts:
+
+```go
+import (
+    "context"
+    "time"
+)
+
+// Create context with timeout
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+
+// Use context in SDK calls
+authResult, err := scalekitClient.AuthenticateWithCode(
+    ctx,
+    code,
+    redirectUri,
+    options,
+)
+
+if err != nil {
+    if ctx.Err() == context.DeadlineExceeded {
+        log.Println("Request timed out")
+    }
+    return err
+}
+```
+
+## Framework Examples
+
+### Gin
+
+Complete Gin integration:
+
+```go title="main.go"
+package main
+
+import (
+    "context"
+    "net/http"
+    "os"
+
+    "github.com/gin-contrib/sessions"
+    "github.com/gin-contrib/sessions/cookie"
+    "github.com/gin-gonic/gin"
+    "github.com/scalekit-inc/scalekit-sdk-go"
+)
+
+var scalekitClient *scalekit.ScalekitClient
+
+func main() {
+    var err error
+    scalekitClient, err = scalekit.NewScalekitClient(
+        os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+        os.Getenv("SCALEKIT_CLIENT_ID"),
+        os.Getenv("SCALEKIT_CLIENT_SECRET"),
+    )
+    if err != nil {
+        panic(err)
+    }
+
+    r := gin.Default()
+
+    // Setup session store
+    store := cookie.NewStore([]byte(os.Getenv("SESSION_SECRET")))
+    r.Use(sessions.Sessions("mysession", store))
+
+    r.GET("/login", loginHandler)
+    r.GET("/auth/callback", callbackHandler)
+    r.GET("/dashboard", AuthMiddleware(), dashboardHandler)
+
+    r.Run(":8080")
+}
+
+func loginHandler(c *gin.Context) {
+    state := generateState()
+
+    session := sessions.Default(c)
+    session.Set("oauth_state", state)
+    session.Save()
+
+    options := scalekit.AuthorizationUrlOptions{
+        Scopes: []string{"openid", "profile", "email"},
+        State:  state,
+    }
+
+    url, _ := scalekitClient.GetAuthorizationUrl(
+        "https://yourapp.com/auth/callback",
+        options,
+    )
+
+    c.Redirect(http.StatusFound, url.String())
+}
+
+func callbackHandler(c *gin.Context) {
+    code := c.Query("code")
+    state := c.Query("state")
+
+    session := sessions.Default(c)
+    storedState := session.Get("oauth_state")
+
+    if state != storedState {
+        c.String(http.StatusBadRequest, "Invalid state")
+        return
+    }
+
+    options := scalekit.AuthenticationOptions{}
+    authResult, err := scalekitClient.AuthenticateWithCode(
+        c.Request.Context(),
+        code,
+        "https://yourapp.com/auth/callback",
+        options,
+    )
+
+    if err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed"})
+        return
+    }
+
+    session.Set("user", authResult.User)
+    session.Save()
+
+    c.Redirect(http.StatusFound, "/dashboard")
+}
+
+func dashboardHandler(c *gin.Context) {
+    c.JSON(http.StatusOK, gin.H{"message": "Welcome to dashboard"})
+}
+```
+
+### Echo
+
+Echo framework integration:
+
+```go title="main.go"
+package main
+
+import (
+    "net/http"
+    "os"
+
+    "github.com/labstack/echo/v4"
+    "github.com/scalekit-inc/scalekit-sdk-go"
+)
+
+var scalekitClient *scalekit.ScalekitClient
+
+func main() {
+    var err error
+    scalekitClient, err = scalekit.NewScalekitClient(
+        os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+        os.Getenv("SCALEKIT_CLIENT_ID"),
+        os.Getenv("SCALEKIT_CLIENT_SECRET"),
+    )
+    if err != nil {
+        panic(err)
+    }
+
+    e := echo.New()
+
+    e.GET("/login", loginHandler)
+    e.GET("/auth/callback", callbackHandler)
+
+    e.Logger.Fatal(e.Start(":8080"))
+}
+
+func loginHandler(c echo.Context) error {
+    options := scalekit.AuthorizationUrlOptions{
+        Scopes: []string{"openid", "profile", "email"},
+    }
+
+    url, _ := scalekitClient.GetAuthorizationUrl(
+        "https://yourapp.com/auth/callback",
+        options,
+    )
+
+    return c.Redirect(http.StatusFound, url.String())
+}
+
+func callbackHandler(c echo.Context) error {
+    code := c.QueryParam("code")
+
+    options := scalekit.AuthenticationOptions{}
+    authResult, err := scalekitClient.AuthenticateWithCode(
+        c.Request().Context(),
+        code,
+        "https://yourapp.com/auth/callback",
+        options,
+    )
+
+    if err != nil {
+        return c.JSON(http.StatusUnauthorized, map[string]string{
+            "error": "Authentication failed",
+        })
+    }
+
+    // Store user in session
+    return c.Redirect(http.StatusFound, "/dashboard")
+}
+```
+
+## Concurrent Operations
+
+The SDK is safe for concurrent use:
+
+```go
+import "sync"
+
+func validateMultipleTokens(tokens []string) []bool {
+    var wg sync.WaitGroup
+    results := make([]bool, len(tokens))
+    ctx := context.Background()
+
+    for i, token := range tokens {
+        wg.Add(1)
+        go func(index int, accessToken string) {
+            defer wg.Done()
+            isValid, _ := scalekitClient.ValidateAccessToken(ctx, accessToken)
+            results[index] = isValid
+        }(i, token)
+    }
+
+    wg.Wait()
+    return results
+}
+```
+
+## Resources
+
+- [GitHub Repository](https://github.com/scalekit-inc/scalekit-sdk-go)
+- [Go Package Documentation](https://pkg.go.dev/github.com/scalekit-inc/scalekit-sdk-go)
+- [Installation Guide](/sdks/installation/)
+- [Configuration Guide](/sdks/configuration/)
+- [Error Handling](/sdks/error-handling/)
+- [Code Examples](/sdks/examples/)

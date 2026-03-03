@@ -1,0 +1,170 @@
+---
+title: "Update organization"
+description: "Update an organization's display name, external ID, or metadata"
+---
+
+## PATCH /api/v1/organizations/{id}
+
+Updates an organization's display name, external ID, or metadata. Requires a valid organization identifier. Region code cannot be modified through this endpoint.
+
+## Request
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  Unique identifier of the organization to be updated.
+  
+  ```
+  org_59615193906282635
+  ```
+</ParamField>
+
+### Body Parameters
+
+<ParamField body="display_name" type="string">
+  Name of the organization to display in the UI. Must be between 1 and 200 characters.
+  
+  ```
+  Acme Corporation
+  ```
+</ParamField>
+
+<ParamField body="external_id" type="string">
+  Your application's unique identifier for this organization, used to link Scalekit with your system.
+  
+  ```
+  tenant_12345
+  ```
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Custom key-value pairs to store with the organization. Keys must be 3-25 characters, values must be 1-256 characters. Maximum 10 pairs allowed.
+  
+  ```json
+  {
+    "industry": "technology",
+    "plan": "enterprise"
+  }
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="organization" type="object">
+  The updated organization with all current details reflected in the response.
+
+  <Expandable title="organization object">
+    <ResponseField name="id" type="string">
+      Unique scalekit-generated identifier
+    </ResponseField>
+
+    <ResponseField name="display_name" type="string">
+      Updated name of the organization
+    </ResponseField>
+
+    <ResponseField name="external_id" type="string">
+      Updated external identifier
+    </ResponseField>
+
+    <ResponseField name="metadata" type="object">
+      Updated metadata key-value pairs
+    </ResponseField>
+
+    <ResponseField name="region_code" type="string">
+      Geographic region code (immutable)
+    </ResponseField>
+
+    <ResponseField name="create_time" type="string">
+      Timestamp when the organization was created (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="update_time" type="string">
+      Timestamp when the organization was last updated (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="settings" type="object">
+      Organization settings
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+const organization = await scalekit.organization.updateOrganization(organization_id, {
+    displayName: 'Acme Corporation',
+    externalId: 'tenant_12345',
+});
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+from scalekit import ScalekitClient
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENV_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+organization = scalekit_client.organization.update_organization(organization_id, {
+    "display_name": "Acme Corporation",
+    "external_id": "tenant_12345"
+})
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENV_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+organization, err := scalekitClient.Organization.UpdateOrganization(
+    ctx,
+    organizationId,
+    &scalekit.UpdateOrganization{
+        DisplayName: "Acme Corporation",
+        ExternalId:  "tenant_12345",
+    },
+)
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+import com.scalekit.grpc.scalekit.v1.organizations.*;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENV_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+UpdateOrganization updateOrganization = UpdateOrganization.newBuilder()
+    .setDisplayName("Acme Corporation")
+    .setExternalId("tenant_12345")
+    .build();
+
+Organization updatedOrganization = scalekitClient.organizations().updateById(organizationId, updateOrganization);
+```
+  </TabItem>
+
+  <TabItem label="cURL">
+```bash
+curl -X PATCH 'https://<SCALEKIT_ENV_URL>/api/v1/organizations/{organization_id}' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "display_name": "Acme Corporation",
+    "external_id": "tenant_12345"
+  }'
+```
+  </TabItem>
+</Tabs>

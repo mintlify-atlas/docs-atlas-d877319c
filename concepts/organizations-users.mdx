@@ -1,0 +1,342 @@
+---
+title: Organizations and users
+description: Understand Scalekit's multi-tenant organization and user model
+---
+
+Scalekit provides a flexible organization and user model designed for multi-tenant B2B applications. This guide explains the key concepts and relationships.
+
+## Organizations
+
+Organizations represent tenants in your application. Each organization contains users, SSO connections, settings, and data.
+
+### Organization structure
+
+- **Organization ID**: Unique identifier (e.g., `org_1234567890`)
+- **Display name**: Human-readable name (e.g., "Acme Corporation")
+- **Domains**: Email domains owned by the organization (e.g., `@acme.com`)
+- **Members**: Users belonging to the organization
+- **SSO connections**: Enterprise identity provider configurations
+- **Metadata**: Custom attributes for organization-specific data
+
+### Creating organizations
+
+<CodeGroup>
+
+```javascript Node.js
+const organization = await scalekit.organization.create({
+  displayName: 'Acme Corporation',
+  externalId: 'acme-corp-123',
+  metadata: {
+    plan: 'enterprise',
+    industry: 'technology'
+  }
+});
+```
+
+```python Python
+organization = scalekit_client.organization.create(
+    display_name='Acme Corporation',
+    external_id='acme-corp-123',
+    metadata={
+        'plan': 'enterprise',
+        'industry': 'technology'
+    }
+)
+```
+
+```go Go
+organization, err := scalekitClient.Organization().Create(ctx, &scalekit.CreateOrganizationRequest{
+    DisplayName: "Acme Corporation",
+    ExternalId: "acme-corp-123",
+    Metadata: map[string]string{
+        "plan": "enterprise",
+        "industry": "technology",
+    },
+})
+```
+
+```java Java
+Organization organization = scalekitClient.organizations().create(
+    new CreateOrganizationRequest()
+        .setDisplayName("Acme Corporation")
+        .setExternalId("acme-corp-123")
+        .setMetadata(Map.of(
+            "plan", "enterprise",
+            "industry", "technology"
+        ))
+);
+```
+
+</CodeGroup>
+
+## Users
+
+Users are individuals who authenticate and access your application. Users can belong to one or more organizations.
+
+### User structure
+
+- **User ID**: Unique identifier (e.g., `usr_1234567890`)
+- **Email**: Primary email address
+- **Name**: Display name
+- **Profile**: Additional attributes (phone, picture, etc.)
+- **Memberships**: Organizations the user belongs to
+- **Identities**: Linked authentication methods
+
+### User creation
+
+Users are created automatically during authentication or can be created programmatically:
+
+<CodeGroup>
+
+```javascript Node.js
+const user = await scalekit.user.create({
+  email: 'john@acme.com',
+  givenName: 'John',
+  familyName: 'Doe',
+  organizationId: 'org_1234567890'
+});
+```
+
+```python Python
+user = scalekit_client.user.create(
+    email='john@acme.com',
+    given_name='John',
+    family_name='Doe',
+    organization_id='org_1234567890'
+)
+```
+
+```go Go
+user, err := scalekitClient.User().Create(ctx, &scalekit.CreateUserRequest{
+    Email: "john@acme.com",
+    GivenName: "John",
+    FamilyName: "Doe",
+    OrganizationId: "org_1234567890",
+})
+```
+
+```java Java
+User user = scalekitClient.users().create(
+    new CreateUserRequest()
+        .setEmail("john@acme.com")
+        .setGivenName("John")
+        .setFamilyName("Doe")
+        .setOrganizationId("org_1234567890")
+);
+```
+
+</CodeGroup>
+
+## Multi-tenancy patterns
+
+### Single organization per user
+
+Simplest model where each user belongs to exactly one organization.
+
+**Use cases**:
+- Traditional B2B SaaS
+- Enterprise applications
+- Internal tools
+
+**Implementation**:
+```javascript
+const user = await scalekit.user.get(userId);
+const organizationId = user.organizationId;
+```
+
+### Multiple organizations per user
+
+Users can belong to multiple organizations and switch between them.
+
+**Use cases**:
+- Collaboration platforms
+- Consulting tools
+- Freelancer applications
+
+**Implementation**:
+```javascript
+const memberships = await scalekit.user.listOrganizations(userId);
+
+// User selects organization
+const selectedOrg = memberships[0].organizationId;
+
+// Create new session scoped to organization
+const authUrl = scalekit.getAuthorizationUrl(redirectUri, {
+  organizationId: selectedOrg
+});
+```
+
+### Workspaces
+
+Organizations can contain multiple workspaces for team collaboration.
+
+**Use cases**:
+- Project management tools
+- Design collaboration platforms
+- Development environments
+
+**Implementation**:
+```javascript
+// Organization has multiple workspaces
+const workspaces = await scalekit.organization.listWorkspaces(orgId);
+
+// User accesses specific workspace
+const workspace = workspaces.find(w => w.id === workspaceId);
+```
+
+## Domain management
+
+Email domains define organization ownership and enable automatic routing.
+
+### Domain verification
+
+Verify domain ownership to enable:
+- Automatic user assignment
+- Domain-based SSO routing
+- Email domain restrictions
+
+**Verification methods**:
+- DNS TXT record
+- Meta tag in website HTML
+- File upload to website root
+
+### Domain-based routing
+
+Automatically route users to the correct organization based on email domain:
+
+```javascript
+const email = 'john@acme.com';
+const domain = email.split('@')[1];
+
+// Check if domain has SSO configured
+const connections = await scalekit.connections.listConnectionsByDomain({ domain });
+
+if (connections.length > 0) {
+  // Redirect to SSO
+  const authUrl = scalekit.getAuthorizationUrl(redirectUri, {
+    domainHint: domain
+  });
+  return redirect(authUrl);
+} else {
+  // Show standard login
+  return showPasswordLogin();
+}
+```
+
+## Organization roles and permissions
+
+Define roles to control user access within organizations.
+
+### Built-in roles
+
+- **Owner**: Full administrative access
+- **Admin**: Manage users and settings
+- **Member**: Standard user access
+- **Guest**: Limited access
+
+### Custom roles
+
+Define application-specific roles:
+
+```javascript
+const role = await scalekit.organization.createRole(organizationId, {
+  name: 'Editor',
+  permissions: [
+    'read:documents',
+    'write:documents',
+    'comment:documents'
+  ]
+});
+
+// Assign role to user
+await scalekit.organization.assignRole(organizationId, userId, role.id);
+```
+
+### Permission checking
+
+Check user permissions in application logic:
+
+```javascript
+const hasPermission = await scalekit.user.hasPermission(
+  userId,
+  organizationId,
+  'write:documents'
+);
+
+if (hasPermission) {
+  // Allow document editing
+} else {
+  // Return 403 Forbidden
+}
+```
+
+## User invitations
+
+Invite users to join organizations:
+
+<CodeGroup>
+
+```javascript Node.js
+const invitation = await scalekit.organization.inviteUser(organizationId, {
+  email: 'newuser@acme.com',
+  role: 'member',
+  sendEmail: true
+});
+```
+
+```python Python
+invitation = scalekit_client.organization.invite_user(
+    organization_id,
+    email='newuser@acme.com',
+    role='member',
+    send_email=True
+)
+```
+
+```go Go
+invitation, err := scalekitClient.Organization().InviteUser(ctx, organizationId, &scalekit.InviteUserRequest{
+    Email: "newuser@acme.com",
+    Role: "member",
+    SendEmail: true,
+})
+```
+
+```java Java
+Invitation invitation = scalekitClient.organizations().inviteUser(
+    organizationId,
+    new InviteUserRequest()
+        .setEmail("newuser@acme.com")
+        .setRole("member")
+        .setSendEmail(true)
+);
+```
+
+</CodeGroup>
+
+## SCIM provisioning
+
+Automate user lifecycle management with SCIM:
+
+- **Automatic user creation**: Users are created when assigned in IdP
+- **Profile sync**: User attributes stay synchronized
+- **Group-based access**: Map IdP groups to organization roles
+- **Deprovisioning**: Users are removed when unassigned in IdP
+
+See [SCIM provisioning guide](/guides/scim-provisioning) for implementation details.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authorization" icon="shield-check" href="/concepts/authorization">
+    Implement role-based access control
+  </Card>
+  <Card title="SCIM provisioning" icon="users-gear" href="/guides/scim-provisioning">
+    Automate user lifecycle management
+  </Card>
+  <Card title="Organizations API" icon="code" href="/api/organizations/create">
+    Complete organizations API reference
+  </Card>
+  <Card title="Users API" icon="code" href="/api/users/create">
+    Complete users API reference
+  </Card>
+</CardGroup>

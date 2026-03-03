@@ -1,0 +1,316 @@
+---
+title: 'Create user'
+description: 'Create a new user account and add them to an organization'
+---
+
+## POST /api/v1/organizations/{organization_id}/users
+
+Creates a new user account and immediately adds them to the specified organization. Use this endpoint when you want to create a user and grant them access to an organization in a single operation.
+
+## Request
+
+### Path Parameters
+
+<ParamField path="organization_id" type="string" required>
+  Organization ID where the user will be created.
+  
+  ```
+  org_123
+  ```
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="send_invitation_email" type="boolean">
+  If true, sends an activation email to the user. Defaults to true.
+  
+  ```
+  true
+  ```
+</ParamField>
+
+### Body Parameters
+
+<ParamField body="email" type="string" required>
+  Primary email address for the user. Must be unique across the environment.
+  
+  ```
+  user@example.com
+  ```
+</ParamField>
+
+<ParamField body="external_id" type="string">
+  Your application's unique identifier for this user.
+  
+  ```
+  ext_12345a67b89c
+  ```
+</ParamField>
+
+<ParamField body="user_profile" type="object">
+  User's personal information including name and contact details.
+  
+  <Expandable title="user_profile fields">
+    <ParamField body="user_profile.given_name" type="string">
+      User's first name. Maximum 255 characters.
+    </ParamField>
+
+    <ParamField body="user_profile.family_name" type="string">
+      User's last name. Maximum 255 characters.
+    </ParamField>
+
+    <ParamField body="user_profile.name" type="string">
+      Full name in display format.
+    </ParamField>
+
+    <ParamField body="user_profile.phone_number" type="string">
+      Phone number in E.164 international format.
+      
+      ```
+      +14155552671
+      ```
+    </ParamField>
+
+    <ParamField body="user_profile.locale" type="string">
+      User's localization preference in BCP-47 format.
+      
+      ```
+      en-US
+      ```
+    </ParamField>
+
+    <ParamField body="user_profile.picture" type="string">
+      URL to the user's profile picture.
+    </ParamField>
+
+    <ParamField body="user_profile.custom_attributes" type="object">
+      Custom attributes for extended user profile data.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="membership" type="object">
+  Membership details including roles and metadata.
+  
+  <Expandable title="membership fields">
+    <ParamField body="membership.roles" type="array">
+      List of roles to assign to the user.
+      
+      ```json
+      [{"name": "member"}]
+      ```
+    </ParamField>
+
+    <ParamField body="membership.metadata" type="object">
+      Custom key-value pairs for storing additional membership context.
+      
+      ```json
+      {
+        "department": "engineering",
+        "location": "nyc-office"
+      }
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Custom key-value pairs for storing additional user context.
+  
+  ```json
+  {
+    "department": "engineering",
+    "location": "nyc-office"
+  }
+  ```
+</ParamField>
+
+## Response
+
+<ResponseField name="user" type="object">
+  The created user object, including system-generated identifiers and timestamps.
+
+  <Expandable title="user object">
+    <ResponseField name="id" type="string">
+      Unique system-generated identifier for the user
+      
+      ```
+      usr_1234abcd5678efgh
+      ```
+    </ResponseField>
+
+    <ResponseField name="email" type="string">
+      Primary email address for the user
+    </ResponseField>
+
+    <ResponseField name="external_id" type="string">
+      Your application's unique identifier
+    </ResponseField>
+
+    <ResponseField name="user_profile" type="object">
+      User's personal information
+    </ResponseField>
+
+    <ResponseField name="memberships" type="array">
+      List of organization memberships
+    </ResponseField>
+
+    <ResponseField name="metadata" type="object">
+      Custom key-value pairs
+    </ResponseField>
+
+    <ResponseField name="create_time" type="string">
+      Timestamp when the user account was created (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="update_time" type="string">
+      Timestamp of the last modification (ISO 8601)
+    </ResponseField>
+
+    <ResponseField name="last_login_time" type="string">
+      Timestamp of the user's most recent successful authentication (ISO 8601)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```ts
+const { user } = await scalekit.user.createUserAndMembership("org_123", {
+    email: "user@example.com",
+    externalId: "ext_12345a67b89c",
+    metadata: { 
+        department: "engineering", 
+        location: "nyc-office" 
+    },
+    userProfile: {
+        firstName: "John",
+        lastName: "Doe",
+    },
+});
+```
+  </TabItem>
+
+  <TabItem label="Python">
+```py
+from scalekit import ScalekitClient
+from scalekit.v1.users.users_pb2 import CreateUser
+
+scalekit_client = ScalekitClient(
+    env_url=os.getenv("SCALEKIT_ENV_URL"),
+    client_id=os.getenv("SCALEKIT_CLIENT_ID"),
+    client_secret=os.getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+user = CreateUser(
+    email="john.doe@example.com",
+    external_id="ext_john_123",
+    user_profile={
+        "first_name": "John",
+        "last_name": "Doe",
+        "name": "John Doe",
+        "locale": "en-US",
+        "phone_number": "+14155552671"
+    },
+    membership={
+        "roles": [{"name": "member"}]
+    }
+)
+
+response = scalekit_client.users.create_user_and_membership(
+    organization_id="org_123",
+    user=user,
+    send_invitation_email=True
+)
+
+user_id = response[0].user.id
+```
+  </TabItem>
+
+  <TabItem label="Go">
+```go
+scalekitClient := scalekit.NewScalekitClient(
+    os.Getenv("SCALEKIT_ENV_URL"),
+    os.Getenv("SCALEKIT_CLIENT_ID"),
+    os.Getenv("SCALEKIT_CLIENT_SECRET"),
+)
+
+newUser := &usersv1.CreateUser{
+    Email:      "user@example.com",
+    ExternalId: "ext_12345a67b89c",
+    Metadata: map[string]string{
+        "department": "engineering",
+        "location":   "nyc-office",
+    },
+    UserProfile: &usersv1.CreateUserProfile{
+        FirstName: "John",
+        LastName:  "Doe",
+    },
+}
+
+cuResp, err := scalekitClient.User().CreateUserAndMembership(ctx, "org_123", newUser, false)
+if err != nil {
+    // Handle error
+}
+```
+  </TabItem>
+
+  <TabItem label="Java">
+```java
+import com.scalekit.ScalekitClient;
+import com.scalekit.grpc.scalekit.v1.users.*;
+
+ScalekitClient scalekitClient = new ScalekitClient(
+    System.getenv("SCALEKIT_ENV_URL"),
+    System.getenv("SCALEKIT_CLIENT_ID"),
+    System.getenv("SCALEKIT_CLIENT_SECRET")
+);
+
+CreateUser createUser = CreateUser.newBuilder()
+    .setEmail("user@example.com")
+    .setExternalId("ext_12345a67b89c")
+    .putMetadata("department", "engineering")
+    .putMetadata("location", "nyc-office")
+    .setUserProfile(
+        CreateUserProfile.newBuilder()
+            .setFirstName("John")
+            .setLastName("Doe")
+            .build())
+    .build();
+
+CreateUserAndMembershipRequest cuReq = CreateUserAndMembershipRequest.newBuilder()
+    .setUser(createUser)
+    .build();
+
+CreateUserAndMembershipResponse cuResp = scalekitClient.users().createUserAndMembership("org_123", cuReq);
+System.out.println(cuResp.getUser().getId());
+```
+  </TabItem>
+
+  <TabItem label="cURL">
+```bash
+curl -X POST 'https://<SCALEKIT_ENV_URL>/api/v1/organizations/org_123/users?send_invitation_email=true' \
+  -H 'Authorization: Bearer <ACCESS_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "user@example.com",
+    "external_id": "ext_12345a67b89c",
+    "user_profile": {
+      "given_name": "John",
+      "family_name": "Doe"
+    },
+    "metadata": {
+      "department": "engineering"
+    }
+  }'
+```
+  </TabItem>
+</Tabs>
+
+## Error Responses
+
+<ResponseField name="201" type="success">
+  User created successfully
+</ResponseField>

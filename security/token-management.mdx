@@ -1,0 +1,255 @@
+---
+title: Token management
+description: Best practices for secure token handling and storage
+---
+
+Proper token management is critical for application security. This guide covers best practices for handling access tokens, refresh tokens, and ID tokens.
+
+## Token types
+
+### Access tokens
+
+- **Lifetime**: Short-lived (5-60 minutes)
+- **Purpose**: Authorize API requests
+- **Storage**: HttpOnly cookies or Authorization headers
+- **Validation**: Required on every request
+
+### Refresh tokens
+
+- **Lifetime**: Long-lived (days to months)
+- **Purpose**: Obtain new access tokens
+- **Storage**: Secure HttpOnly cookies
+- **Rotation**: Single-use with automatic rotation
+
+### ID tokens
+
+- **Lifetime**: Varies (usually matches access token)
+- **Purpose**: User identity information
+- **Storage**: Cookies or secure storage
+- **Usage**: Logout flows and user profile
+
+## Secure storage
+
+### Web applications
+
+Use HttpOnly cookies with security attributes:
+
+```javascript
+res.cookie('accessToken', token, {
+  httpOnly: true,   // Prevent XSS
+  secure: true,     // HTTPS only
+  sameSite: 'strict', // CSRF protection
+  maxAge: 300000    // 5 minutes
+});
+```
+
+### Single-page applications
+
+- Store access tokens in memory
+- Use Authorization headers for API calls
+- Never use localStorage or sessionStorage
+- Refresh tokens in HttpOnly cookies
+
+### Mobile applications
+
+- iOS: Use Keychain Services
+- Android: Use KeyStore system
+- Implement certificate pinning
+- Clear tokens on logout
+
+## Token encryption
+
+Encrypt tokens before storage:
+
+```javascript
+const crypto = require('crypto');
+
+function encrypt(token) {
+  const algorithm = 'aes-256-gcm';
+  const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+  const iv = crypto.randomBytes(16);
+  
+  const cipher = crypto.createCipheriv(algorithm, key, iv);
+  let encrypted = cipher.update(token, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${encrypted}:${authTag.toString('hex')}`;
+}
+
+function decrypt(encryptedToken) {
+  const [ivHex, encrypted, authTagHex] = encryptedToken.split(':');
+  const algorithm = 'aes-256-gcm';
+  const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+  const iv = Buffer.from(ivHex, 'hex');
+  const authTag = Buffer.from(authTagHex, 'hex');
+  
+  const decipher = crypto.createDecipheriv(algorithm, key, iv);
+  decipher.setAuthTag(authTag);
+  
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  
+  return decrypted;
+}
+```
+
+## Token validation
+
+Validate tokens on every protected request:
+
+```javascript
+async function validateRequest(req, res, next) {
+  const accessToken = req.cookies.accessToken;
+  
+  if (!accessToken) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  
+  try {
+    const decrypted = decrypt(accessToken);
+    const isValid = await scalekit.validateAccessToken(decrypted);
+    
+    if (!isValid) {
+      // Attempt token refresh
+      return await refreshToken(req, res, next);
+    }
+    
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+```
+
+## Token refresh
+
+Refresh tokens transparently in middleware:
+
+```javascript
+async function refreshToken(req, res, next) {
+  const refreshToken = req.cookies.refreshToken;
+  
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'Session expired' });
+  }
+  
+  try {
+    const decrypted = decrypt(refreshToken);
+    const authResult = await scalekit.refreshAccessToken(decrypted);
+    
+    // Update cookies with new tokens
+    res.cookie('accessToken', encrypt(authResult.accessToken), {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: (authResult.expiresIn - 60) * 1000
+    });
+    
+    res.cookie('refreshToken', encrypt(authResult.refreshToken), {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict'
+    });
+    
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Refresh failed' });
+  }
+}
+```
+
+## Token rotation
+
+Implement refresh token rotation to detect theft:
+
+- Issue new refresh token on each refresh
+- Invalidate old refresh token immediately
+- Track token families to detect concurrent use
+- Revoke all tokens if theft detected
+
+## Security best practices
+
+### Never log tokens
+
+```javascript
+// BAD - Tokens in logs
+console.log('Access token:', accessToken);
+
+// GOOD - Redacted logging
+console.log('Access token:', accessToken.substring(0, 10) + '...');
+```
+
+### Validate token claims
+
+```javascript
+const claims = jwt.decode(accessToken);
+
+if (claims.exp < Date.now() / 1000) {
+  throw new Error('Token expired');
+}
+
+if (claims.iss !== expectedIssuer) {
+  throw new Error('Invalid issuer');
+}
+
+if (!claims.aud.includes(clientId)) {
+  throw new Error('Invalid audience');
+}
+```
+
+### Handle clock skew
+
+```javascript
+const CLOCK_SKEW_SECONDS = 60;
+
+function isTokenExpired(token) {
+  const claims = jwt.decode(token);
+  const now = Math.floor(Date.now() / 1000);
+  return claims.exp < (now - CLOCK_SKEW_SECONDS);
+}
+```
+
+### Implement rate limiting
+
+```javascript
+const rateLimit = require('express-rate-limit');
+
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 refresh attempts
+  message: 'Too many refresh attempts'
+});
+
+app.post('/auth/refresh', refreshLimiter, refreshHandler);
+```
+
+## Token revocation
+
+Revoke tokens when needed:
+
+```javascript
+// Revoke specific session
+await scalekit.session.revokeSession(sessionId);
+
+// Revoke all user sessions
+await scalekit.session.revokeAllUserSessions(userId);
+
+// Clear client-side tokens
+res.clearCookie('accessToken');
+res.clearCookie('refreshToken');
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Session policies" icon="shield" href="/security/session-policies">
+    Configure session timeouts
+  </Card>
+  <Card title="Best practices" icon="check" href="/security/authentication-best-practices">
+    Authentication security guide
+  </Card>
+  <Card title="Session management" icon="clock" href="/concepts/session-management">
+    Session concepts
+  </Card>
+</CardGroup>

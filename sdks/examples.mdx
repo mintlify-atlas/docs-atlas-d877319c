@@ -1,0 +1,1073 @@
+---
+title: 'SDK Examples'
+description: 'Common usage examples and code patterns for Scalekit SDKs across all languages'
+sidebar:
+  label: 'Examples'
+  order: 10
+---
+
+Common usage examples and code patterns for Scalekit SDKs. These examples demonstrate real-world authentication workflows across all supported languages.
+
+## Complete Authentication Flow
+
+Implement a full OAuth authentication flow:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript title="Complete auth flow"
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
+import { Scalekit } from '@scalekit-sdk/node';
+import crypto from 'crypto';
+
+const app = express();
+app.use(cookieParser());
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+}));
+
+const scalekit = new Scalekit(
+  process.env.SCALEKIT_ENVIRONMENT_URL,
+  process.env.SCALEKIT_CLIENT_ID,
+  process.env.SCALEKIT_CLIENT_SECRET
+);
+
+// Step 1: Initiate login
+app.get('/login', (req, res) => {
+  const state = crypto.randomBytes(16).toString('hex');
+  req.session.oauthState = state;
+
+  const url = scalekit.getAuthorizationUrl(
+    'https://yourapp.com/auth/callback',
+    {
+      scopes: ['openid', 'profile', 'email', 'offline_access'],
+      state,
+    }
+  );
+
+  res.redirect(url);
+});
+
+// Step 2: Handle callback
+app.get('/auth/callback', async (req, res) => {
+  const { code, state, error } = req.query;
+
+  // Validate state
+  if (state !== req.session.oauthState) {
+    return res.status(400).send('Invalid state');
+  }
+  delete req.session.oauthState;
+
+  if (error) {
+    return res.redirect('/login?error=auth_failed');
+  }
+
+  try {
+    // Exchange code for tokens
+    const authResult = await scalekit.authenticateWithCode(
+      code,
+      'https://yourapp.com/auth/callback'
+    );
+
+    // Store tokens securely
+    res.cookie('accessToken', authResult.accessToken, {
+      maxAge: (authResult.expiresIn - 60) * 1000,
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+    });
+
+    res.cookie('refreshToken', authResult.refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+    });
+
+    req.session.user = authResult.user;
+    res.redirect('/dashboard');
+  } catch (error) {
+    console.error('Authentication failed:', error);
+    res.redirect('/login?error=exchange_failed');
+  }
+});
+
+// Step 3: Protected route
+app.get('/dashboard', async (req, res) => {
+  const { accessToken } = req.cookies;
+
+  if (!accessToken) {
+    return res.redirect('/login');
+  }
+
+  try {
+    const isValid = await scalekit.validateAccessToken(accessToken);
+
+    if (!isValid) {
+      return res.redirect('/login?error=session_expired');
+    }
+
+    res.json({ user: req.session.user });
+  } catch (error) {
+    console.error('Token validation failed:', error);
+    res.redirect('/login');
+  }
+});
+
+app.listen(3000);
+```
+  </TabItem>
+  <TabItem label="Python">
+```python title="Complete auth flow"
+from flask import Flask, session, redirect, request, jsonify
+from scalekit import ScalekitClient, AuthorizationUrlOptions, CodeAuthenticationOptions
+import os
+import secrets
+
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY')
+
+scalekit_client = ScalekitClient(
+    os.environ.get('SCALEKIT_ENVIRONMENT_URL'),
+    os.environ.get('SCALEKIT_CLIENT_ID'),
+    os.environ.get('SCALEKIT_CLIENT_SECRET')
+)
+
+# Step 1: Initiate login
+@app.route('/login')
+def login():
+    state = secrets.token_hex(16)
+    session['oauth_state'] = state
+
+    options = AuthorizationUrlOptions(
+        scopes=['openid', 'profile', 'email', 'offline_access'],
+        state=state
+    )
+
+    url = scalekit_client.get_authorization_url(
+        'https://yourapp.com/auth/callback',
+        options
+    )
+
+    return redirect(url)
+
+# Step 2: Handle callback
+@app.route('/auth/callback')
+def callback():
+    code = request.args.get('code')
+    state = request.args.get('state')
+    error = request.args.get('error')
+
+    # Validate state
+    stored_state = session.pop('oauth_state', None)
+    if state != stored_state:
+        return 'Invalid state', 400
+
+    if error:
+        return redirect('/login?error=auth_failed')
+
+    try:
+        # Exchange code for tokens
+        options = CodeAuthenticationOptions()
+        auth_result = scalekit_client.authenticate_with_code(
+            code,
+            'https://yourapp.com/auth/callback',
+            options
+        )
+
+        # Store tokens securely
+        response = redirect('/dashboard')
+        response.set_cookie(
+            'accessToken',
+            auth_result.access_token,
+            max_age=auth_result.expires_in - 60,
+            httponly=True,
+            secure=True,
+            samesite='Strict'
+        )
+        response.set_cookie(
+            'refreshToken',
+            auth_result.refresh_token,
+            httponly=True,
+            secure=True,
+            samesite='Strict'
+        )
+
+        session['user'] = auth_result.user
+        return response
+
+    except Exception as error:
+        print(f'Authentication failed: {error}')
+        return redirect('/login?error=exchange_failed')
+
+# Step 3: Protected route
+@app.route('/dashboard')
+def dashboard():
+    access_token = request.cookies.get('accessToken')
+
+    if not access_token:
+        return redirect('/login')
+
+    try:
+        is_valid = scalekit_client.validate_access_token(access_token)
+
+        if not is_valid:
+            return redirect('/login?error=session_expired')
+
+        return jsonify({'user': session.get('user')})
+
+    except Exception as error:
+        print(f'Token validation failed: {error}')
+        return redirect('/login')
+
+if __name__ == '__main__':
+    app.run(port=3000)
+```
+  </TabItem>
+  <TabItem label="Go">
+```go title="Complete auth flow"
+package main
+
+import (
+    "crypto/rand"
+    "encoding/hex"
+    "net/http"
+    "os"
+
+    "github.com/gin-contrib/sessions"
+    "github.com/gin-contrib/sessions/cookie"
+    "github.com/gin-gonic/gin"
+    "github.com/scalekit-inc/scalekit-sdk-go"
+)
+
+var scalekitClient *scalekit.ScalekitClient
+
+func main() {
+    var err error
+    scalekitClient, err = scalekit.NewScalekitClient(
+        os.Getenv("SCALEKIT_ENVIRONMENT_URL"),
+        os.Getenv("SCALEKIT_CLIENT_ID"),
+        os.Getenv("SCALEKIT_CLIENT_SECRET"),
+    )
+    if err != nil {
+        panic(err)
+    }
+
+    r := gin.Default()
+
+    store := cookie.NewStore([]byte(os.Getenv("SESSION_SECRET")))
+    r.Use(sessions.Sessions("mysession", store))
+
+    r.GET("/login", loginHandler)
+    r.GET("/auth/callback", callbackHandler)
+    r.GET("/dashboard", dashboardHandler)
+
+    r.Run(":3000")
+}
+
+// Step 1: Initiate login
+func loginHandler(c *gin.Context) {
+    state := generateState()
+
+    session := sessions.Default(c)
+    session.Set("oauth_state", state)
+    session.Save()
+
+    options := scalekit.AuthorizationUrlOptions{
+        Scopes: []string{"openid", "profile", "email", "offline_access"},
+        State:  state,
+    }
+
+    url, _ := scalekitClient.GetAuthorizationUrl(
+        "https://yourapp.com/auth/callback",
+        options,
+    )
+
+    c.Redirect(http.StatusFound, url.String())
+}
+
+// Step 2: Handle callback
+func callbackHandler(c *gin.Context) {
+    code := c.Query("code")
+    state := c.Query("state")
+    errorParam := c.Query("error")
+
+    // Validate state
+    session := sessions.Default(c)
+    storedState := session.Get("oauth_state")
+    session.Delete("oauth_state")
+    session.Save()
+
+    if state != storedState {
+        c.String(http.StatusBadRequest, "Invalid state")
+        return
+    }
+
+    if errorParam != "" {
+        c.Redirect(http.StatusFound, "/login?error=auth_failed")
+        return
+    }
+
+    // Exchange code for tokens
+    options := scalekit.AuthenticationOptions{}
+    authResult, err := scalekitClient.AuthenticateWithCode(
+        c.Request.Context(),
+        code,
+        "https://yourapp.com/auth/callback",
+        options,
+    )
+
+    if err != nil {
+        c.Redirect(http.StatusFound, "/login?error=exchange_failed")
+        return
+    }
+
+    // Store tokens securely
+    c.SetSameSite(http.SameSiteStrictMode)
+    c.SetCookie(
+        "accessToken",
+        authResult.AccessToken,
+        authResult.ExpiresIn-60,
+        "/",
+        "",
+        true,
+        true,
+    )
+    c.SetCookie(
+        "refreshToken",
+        authResult.RefreshToken,
+        0,
+        "/",
+        "",
+        true,
+        true,
+    )
+
+    session.Set("user", authResult.User)
+    session.Save()
+
+    c.Redirect(http.StatusFound, "/dashboard")
+}
+
+// Step 3: Protected route
+func dashboardHandler(c *gin.Context) {
+    accessToken, err := c.Cookie("accessToken")
+
+    if err != nil || accessToken == "" {
+        c.Redirect(http.StatusFound, "/login")
+        return
+    }
+
+    isValid, err := scalekitClient.ValidateAccessToken(
+        c.Request.Context(),
+        accessToken,
+    )
+
+    if err != nil || !isValid {
+        c.Redirect(http.StatusFound, "/login?error=session_expired")
+        return
+    }
+
+    session := sessions.Default(c)
+    user := session.Get("user")
+
+    c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
+func generateState() string {
+    b := make([]byte, 16)
+    rand.Read(b)
+    return hex.EncodeToString(b)
+}
+```
+  </TabItem>
+  <TabItem label="Java">
+```java title="Complete auth flow"
+import com.scalekit.ScalekitClient;
+import com.scalekit.client.models.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.view.RedirectView;
+import javax.servlet.http.*;
+import java.net.URL;
+import java.util.Arrays;
+import java.util.UUID;
+
+@Controller
+public class AuthController {
+
+    @Autowired
+    private ScalekitClient scalekitClient;
+
+    // Step 1: Initiate login
+    @GetMapping("/login")
+    public RedirectView login(HttpSession session) {
+        String state = UUID.randomUUID().toString();
+        session.setAttribute("oauth_state", state);
+
+        AuthorizationUrlOptions options = new AuthorizationUrlOptions();
+        options.setScopes(Arrays.asList("openid", "profile", "email", "offline_access"));
+        options.setState(state);
+
+        URL url = scalekitClient.authentication().getAuthorizationUrl(
+            "https://yourapp.com/auth/callback",
+            options
+        );
+
+        return new RedirectView(url.toString());
+    }
+
+    // Step 2: Handle callback
+    @GetMapping("/auth/callback")
+    public RedirectView callback(
+        @RequestParam(required = false) String code,
+        @RequestParam(required = false) String state,
+        @RequestParam(required = false) String error,
+        HttpSession session,
+        HttpServletResponse response
+    ) {
+        // Validate state
+        String storedState = (String) session.getAttribute("oauth_state");
+        session.removeAttribute("oauth_state");
+
+        if (!state.equals(storedState)) {
+            return new RedirectView("/login?error=invalid_state");
+        }
+
+        if (error != null) {
+            return new RedirectView("/login?error=auth_failed");
+        }
+
+        try {
+            // Exchange code for tokens
+            AuthenticationOptions options = new AuthenticationOptions();
+            AuthenticationResponse authResult = scalekitClient
+                .authentication()
+                .authenticateWithCode(
+                    code,
+                    "https://yourapp.com/auth/callback",
+                    options
+                );
+
+            // Store tokens securely
+            Cookie accessTokenCookie = new Cookie(
+                "accessToken",
+                authResult.getAccessToken()
+            );
+            accessTokenCookie.setMaxAge(authResult.getExpiresIn() - 60);
+            accessTokenCookie.setHttpOnly(true);
+            accessTokenCookie.setSecure(true);
+            accessTokenCookie.setPath("/");
+            response.addCookie(accessTokenCookie);
+
+            Cookie refreshTokenCookie = new Cookie(
+                "refreshToken",
+                authResult.getRefreshToken()
+            );
+            refreshTokenCookie.setHttpOnly(true);
+            refreshTokenCookie.setSecure(true);
+            refreshTokenCookie.setPath("/");
+            response.addCookie(refreshTokenCookie);
+
+            session.setAttribute("user", authResult.getIdTokenClaims());
+            return new RedirectView("/dashboard");
+
+        } catch (Exception e) {
+            System.err.println("Authentication failed: " + e.getMessage());
+            return new RedirectView("/login?error=exchange_failed");
+        }
+    }
+
+    // Step 3: Protected route
+    @GetMapping("/dashboard")
+    @ResponseBody
+    public Object dashboard(HttpServletRequest request, HttpSession session) {
+        String accessToken = getCookieValue(request, "accessToken");
+
+        if (accessToken == null) {
+            return new RedirectView("/login");
+        }
+
+        try {
+            boolean isValid = scalekitClient.validateAccessToken(accessToken);
+
+            if (!isValid) {
+                return new RedirectView("/login?error=session_expired");
+            }
+
+            return Map.of("user", session.getAttribute("user"));
+
+        } catch (Exception e) {
+            System.err.println("Token validation failed: " + e.getMessage());
+            return new RedirectView("/login");
+        }
+    }
+
+    private String getCookieValue(HttpServletRequest request, String name) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (name.equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
+    }
+}
+```
+  </TabItem>
+</Tabs>
+
+## Token Refresh Flow
+
+Automatically refresh expired tokens:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript title="Token refresh middleware"
+async function refreshTokenMiddleware(req, res, next) {
+  const { accessToken, refreshToken } = req.cookies;
+
+  if (!accessToken) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    const isValid = await scalekit.validateAccessToken(accessToken);
+
+    if (!isValid && refreshToken) {
+      // Token expired - refresh it
+      const authResult = await scalekit.refreshAccessToken(refreshToken);
+
+      // Update cookies with new tokens
+      res.cookie('accessToken', authResult.accessToken, {
+        maxAge: (authResult.expiresIn - 60) * 1000,
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+      });
+
+      res.cookie('refreshToken', authResult.refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+      });
+
+      return next();
+    }
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Token validation failed:', error);
+    return res.status(401).json({ error: 'Authentication failed' });
+  }
+}
+
+// Use in routes
+app.get('/api/protected', refreshTokenMiddleware, (req, res) => {
+  res.json({ data: 'Protected data' });
+});
+```
+  </TabItem>
+  <TabItem label="Python">
+```python title="Token refresh decorator"
+from flask import request, jsonify, make_response
+from functools import wraps
+
+def refresh_token_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        access_token = request.cookies.get('accessToken')
+        refresh_token = request.cookies.get('refreshToken')
+
+        if not access_token:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        try:
+            is_valid = scalekit_client.validate_access_token(access_token)
+
+            if not is_valid and refresh_token:
+                # Token expired - refresh it
+                auth_result = scalekit_client.refresh_access_token(refresh_token)
+
+                # Update cookies with new tokens
+                response = make_response(f(*args, **kwargs))
+                response.set_cookie(
+                    'accessToken',
+                    auth_result.access_token,
+                    max_age=auth_result.expires_in - 60,
+                    httponly=True,
+                    secure=True,
+                    samesite='Strict'
+                )
+                response.set_cookie(
+                    'refreshToken',
+                    auth_result.refresh_token,
+                    httponly=True,
+                    secure=True,
+                    samesite='Strict'
+                )
+                return response
+
+            if not is_valid:
+                return jsonify({'error': 'Session expired'}), 401
+
+            return f(*args, **kwargs)
+
+        except Exception as error:
+            print(f'Token validation failed: {error}')
+            return jsonify({'error': 'Authentication failed'}), 401
+
+    return decorated_function
+
+# Use in routes
+@app.route('/api/protected')
+@refresh_token_required
+def protected():
+    return jsonify({'data': 'Protected data'})
+```
+  </TabItem>
+  <TabItem label="Go">
+```go title="Token refresh middleware"
+func RefreshTokenMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        accessToken, err := c.Cookie("accessToken")
+
+        if err != nil || accessToken == "" {
+            c.JSON(http.StatusUnauthorized, gin.H{
+                "error": "Authentication required",
+            })
+            c.Abort()
+            return
+        }
+
+        isValid, err := scalekitClient.ValidateAccessToken(
+            c.Request.Context(),
+            accessToken,
+        )
+
+        if (err != nil || !isValid) {
+            // Token expired - try to refresh
+            refreshToken, err := c.Cookie("refreshToken")
+
+            if err == nil && refreshToken != "" {
+                authResult, err := scalekitClient.RefreshAccessToken(
+                    c.Request.Context(),
+                    refreshToken,
+                )
+
+                if err == nil {
+                    // Update cookies with new tokens
+                    c.SetSameSite(http.SameSiteStrictMode)
+                    c.SetCookie(
+                        "accessToken",
+                        authResult.AccessToken,
+                        authResult.ExpiresIn-60,
+                        "/",
+                        "",
+                        true,
+                        true,
+                    )
+                    c.SetCookie(
+                        "refreshToken",
+                        authResult.RefreshToken,
+                        0,
+                        "/",
+                        "",
+                        true,
+                        true,
+                    )
+                    c.Next()
+                    return
+                }
+            }
+
+            c.JSON(http.StatusUnauthorized, gin.H{
+                "error": "Session expired",
+            })
+            c.Abort()
+            return
+        }
+
+        c.Next()
+    }
+}
+
+// Use in routes
+r.GET("/api/protected", RefreshTokenMiddleware(), func(c *gin.Context) {
+    c.JSON(http.StatusOK, gin.H{"data": "Protected data"})
+})
+```
+  </TabItem>
+  <TabItem label="Java">
+```java title="Token refresh interceptor"
+import javax.servlet.http.*;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+@Component
+public class RefreshTokenInterceptor implements HandlerInterceptor {
+
+    @Override
+    public boolean preHandle(
+        HttpServletRequest request,
+        HttpServletResponse response,
+        Object handler
+    ) throws Exception {
+        String accessToken = getCookieValue(request, "accessToken");
+
+        if (accessToken == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"error\": \"Authentication required\"}");
+            return false;
+        }
+
+        try {
+            boolean isValid = scalekitClient.validateAccessToken(accessToken);
+
+            if (!isValid) {
+                // Token expired - try to refresh
+                String refreshToken = getCookieValue(request, "refreshToken");
+
+                if (refreshToken != null) {
+                    AuthResult authResult = scalekitClient
+                        .authentication()
+                        .refreshToken(refreshToken);
+
+                    // Update cookies with new tokens
+                    Cookie accessTokenCookie = new Cookie(
+                        "accessToken",
+                        authResult.getAccessToken()
+                    );
+                    accessTokenCookie.setMaxAge(authResult.getExpiresIn() - 60);
+                    accessTokenCookie.setHttpOnly(true);
+                    accessTokenCookie.setSecure(true);
+                    accessTokenCookie.setPath("/");
+                    response.addCookie(accessTokenCookie);
+
+                    Cookie refreshTokenCookie = new Cookie(
+                        "refreshToken",
+                        authResult.getRefreshToken()
+                    );
+                    refreshTokenCookie.setHttpOnly(true);
+                    refreshTokenCookie.setSecure(true);
+                    refreshTokenCookie.setPath("/");
+                    response.addCookie(refreshTokenCookie);
+
+                    return true;
+                }
+
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"error\": \"Session expired\"}");
+                return false;
+            }
+
+            return true;
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"error\": \"Authentication failed\"}");
+            return false;
+        }
+    }
+
+    private String getCookieValue(HttpServletRequest request, String name) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (name.equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
+    }
+}
+```
+  </TabItem>
+</Tabs>
+
+## Organization Management
+
+Create and manage organizations:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+// Create organization
+const organization = await scalekit.organization.createOrganization(
+  'Acme Corp',
+  {
+    externalId: 'acme_123',
+  }
+);
+
+console.log('Created organization:', organization.id);
+
+// Generate admin portal link
+const link = await scalekit.organization.generatePortalLink(organization.id);
+console.log('Portal URL:', link.location);
+
+// Get organization details
+const org = await scalekit.organization.getOrganization(organization.id);
+console.log('Organization:', org.displayName);
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+from scalekit.v1.organizations.organizations_pb2 import CreateOrganization
+
+# Create organization
+organization = scalekit_client.organization.create_organization(
+    CreateOrganization(
+        display_name='Acme Corp',
+        external_id='acme_123',
+    )
+)
+
+print(f'Created organization: {organization.id}')
+
+# Generate admin portal link
+link = scalekit_client.organization.generate_portal_link(organization.id)
+print(f'Portal URL: {link.location}')
+
+# Get organization details
+org = scalekit_client.organization.get_organization(organization.id)
+print(f'Organization: {org.display_name}')
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+import "context"
+
+ctx := context.Background()
+
+// Create organization
+organization, err := scalekitClient.Organization.CreateOrganization(
+    ctx,
+    "Acme Corp",
+    scalekit.CreateOrganizationOptions{
+        ExternalID: "acme_123",
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created organization: %s\n", organization.ID)
+
+// Generate admin portal link
+link, err := scalekitClient.Organization().GeneratePortalLink(
+    ctx,
+    organization.ID,
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Portal URL: %s\n", link.Location)
+
+// Get organization details
+org, err := scalekitClient.Organization().GetOrganization(ctx, organization.ID)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Organization: %s\n", org.DisplayName)
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+import com.scalekit.client.models.*;
+
+// Create organization
+CreateOrganizationRequest request = CreateOrganizationRequest.newBuilder()
+    .setName("Acme Corp")
+    .setExternalId("acme_123")
+    .build();
+
+Organization organization = scalekitClient
+    .organization()
+    .createOrganization(request);
+
+System.out.println("Created organization: " + organization.getId());
+
+// Generate admin portal link
+Link link = scalekitClient.organizations().generatePortalLink(
+    organization.getId(),
+    Arrays.asList(Feature.sso, Feature.dir_sync)
+);
+
+System.out.println("Portal URL: " + link.getLocation());
+
+// Get organization details
+Organization org = scalekitClient
+    .organization()
+    .getOrganization(organization.getId());
+
+System.out.println("Organization: " + org.getDisplayName());
+```
+  </TabItem>
+</Tabs>
+
+## Session Management
+
+Manage active user sessions:
+
+<Tabs syncKey="tech-stack">
+  <TabItem label="Node.js">
+```javascript
+// List all active sessions for a user
+const userSessions = await scalekit.session.getUserSessions(
+  'usr_1234567890123456',
+  {
+    pageSize: 10,
+    filter: {
+      status: ['ACTIVE'],
+    },
+  }
+);
+
+console.log('Active sessions:', userSessions.length);
+
+// Revoke a specific session
+await scalekit.session.revokeSession('ses_9876543210987654');
+console.log('Session revoked');
+
+// Revoke all sessions (logout from all devices)
+await scalekit.session.revokeAllUserSessions('usr_1234567890123456');
+console.log('All sessions revoked');
+```
+  </TabItem>
+  <TabItem label="Python">
+```python
+from google.protobuf.timestamp_pb2 import Timestamp
+from datetime import datetime
+
+# List all active sessions for a user
+start_time = Timestamp()
+start_time.FromDatetime(datetime(2025, 1, 1))
+
+filter_obj = scalekit_client.session.create_session_filter(
+    status=['ACTIVE'],
+    start_time=start_time
+)
+
+user_sessions = scalekit_client.session.get_user_sessions(
+    user_id='usr_1234567890123456',
+    page_size=10,
+    filter=filter_obj
+)
+
+print(f'Active sessions: {len(user_sessions)}')
+
+# Revoke a specific session
+scalekit_client.session.revoke_session(session_id='ses_9876543210987654')
+print('Session revoked')
+
+# Revoke all sessions (logout from all devices)
+scalekit_client.session.revoke_all_user_sessions(
+    user_id='usr_1234567890123456'
+)
+print('All sessions revoked')
+```
+  </TabItem>
+  <TabItem label="Go">
+```go
+import (
+    "context"
+    "time"
+    sessionsv1 "github.com/scalekit-inc/scalekit-sdk-go/pkg/grpc/scalekit/v1/sessions"
+    "google.golang.org/protobuf/types/known/timestamppb"
+)
+
+ctx := context.Background()
+
+// List all active sessions for a user
+startTime := time.Now().AddDate(0, -1, 0)
+filter := &sessionsv1.UserSessionFilter{
+    Status:    []string{"ACTIVE"},
+    StartTime: timestamppb.New(startTime),
+}
+
+userSessions, err := scalekitClient.Session().GetUserSessions(
+    ctx,
+    "usr_1234567890123456",
+    10,
+    "",
+    filter,
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Active sessions: %d\n", len(userSessions.Sessions))
+
+// Revoke a specific session
+_, err = scalekitClient.Session().RevokeSession(ctx, "ses_9876543210987654")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println("Session revoked")
+
+// Revoke all sessions (logout from all devices)
+_, err = scalekitClient.Session().RevokeAllUserSessions(
+    ctx,
+    "usr_1234567890123456",
+)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println("All sessions revoked")
+```
+  </TabItem>
+  <TabItem label="Java">
+```java
+import com.scalekit.client.models.*;
+import com.google.protobuf.Timestamp;
+import java.time.Instant;
+
+// List all active sessions for a user
+UserSessionFilter filter = UserSessionFilter.newBuilder()
+    .addStatus("ACTIVE")
+    .setStartTime(
+        Timestamp.newBuilder()
+            .setSeconds(Instant.now().minusSeconds(2592000).getEpochSecond())
+            .build()
+    )
+    .build();
+
+UserSessionDetails userSessions = scalekitClient.sessions().getUserSessions(
+    "usr_1234567890123456",
+    10,
+    "",
+    filter
+);
+
+System.out.println("Active sessions: " + userSessions.getSessionsCount());
+
+// Revoke a specific session
+scalekitClient.sessions().revokeSession("ses_9876543210987654");
+System.out.println("Session revoked");
+
+// Revoke all sessions (logout from all devices)
+scalekitClient.sessions().revokeAllUserSessions("usr_1234567890123456");
+System.out.println("All sessions revoked");
+```
+  </TabItem>
+</Tabs>
+
+## Additional Resources
+
+- [SDK Overview](/sdks/overview/)
+- [Installation Guide](/sdks/installation/)
+- [Configuration](/sdks/configuration/)
+- [Error Handling](/sdks/error-handling/)
+- [GitHub Repositories](https://github.com/scalekit-inc)
